@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "galboss:fs_big_three_core" },
+    { "item": "minecraft:netherite_ingot" }
+  ],
+  "result": {
+    "item": "galboss:fs_badge"
+  }
+}

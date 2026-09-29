@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "galboss:tohka_badge" },
+    { "item": "galboss:rei_armband" },
+    { "item": "galboss:ikuko_medal" }
+  ],
+  "result": {
+    "item": "galboss:fs_big_three_core"
+  }
+}
