@@ -33,8 +33,12 @@ function FillArm($b, $tx, $ty, $ox, $oy) {
     }
 }
 
+# 路径从脚本自身位置推导：$PSScriptRoot = tools/blockbench，不再写死盘符。
+$TEX_SRC = Join-Path $PSScriptRoot 'textures'
+$MOD_TEX = Join-Path $PSScriptRoot '..\..\src\main\resources\assets\galboss\textures\entity'
+
 foreach ($n in @('reizein_tohka', 'onabuta_ikuko', 'tadasugawa_rei')) {
-    $src = "d:\game\mc\bossmod\blockbench\textures\${n}_armed.png"
+    $src = Join-Path $TEX_SRC "${n}_armed.png"
     $tmp = [System.Drawing.Bitmap]::FromFile($src)
     $b = New-Object System.Drawing.Bitmap $tmp
     $tmp.Dispose()
@@ -54,6 +58,6 @@ foreach ($n in @('reizein_tohka', 'onabuta_ikuko', 'tadasugawa_rei')) {
 
     $b.Save($src, [System.Drawing.Imaging.ImageFormat]::Png)
     $b.Dispose()
-    Copy-Item $src "d:\game\mc\bossmod\src\main\resources\assets\galboss\textures\entity\$n.png" -Force
+    Copy-Item $src (Join-Path $MOD_TEX "$n.png") -Force
     Write-Output ("  {0,-16} R {1,3}% -> {2,3}%    L {3,3}% -> {4,3}%" -f $n, [int](100 * $r0 / 48), [int](100 * $r1 / 48), [int](100 * $l0 / 48), [int](100 * $l1 / 48))
 }

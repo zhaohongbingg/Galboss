@@ -56,7 +56,7 @@ public class ModItems {
     // 这两个既是模型载体也是实际物品：怪物手持武器走原版物品系统
     // （见 IkukoKatanaLayer / ReiGunLayer），物品模型在
     // models/item/ikuko_katana.json、rei_gun.json，
-    // 由 blockbench/geo_to_item_model.mjs 从 geo/ 生成 —— 别手改那两个 json。
+    // 由 tools/blockbench/geo_to_item_model.mjs 从 geo/ 生成 —— 别手改那两个 json。
 
     public static final RegistryObject<Item> IKUKO_KATANA = ITEMS.register(
             "ikuko_katana",

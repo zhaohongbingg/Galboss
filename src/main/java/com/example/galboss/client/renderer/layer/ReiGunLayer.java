@@ -17,7 +17,7 @@ import software.bernie.geckolib.renderer.layer.BlockAndItemGeoLayer;
  * 贴图走物品自己的贴图系统，模型里也没有骨骼，角色动画不会按名字套上来。
  *
  * 握持姿态在 {@code models/item/rei_gun.json} 的 display 块里调，由
- * {@code blockbench/geo_to_item_model.mjs} 生成（枪管沿 -Z，所以没套原版 handheld 的
+ * {@code tools/blockbench/geo_to_item_model.mjs} 生成（枪管沿 -Z，所以没套原版 handheld 的
  * [0,-90,55] —— 那个 yaw 会把枪管甩到侧面去）。
  *
  * 挂点在 {@code weapon_anchor}（骨架 v2 里挂在 right_hand 之下），所以肘和腕都会带着枪走。

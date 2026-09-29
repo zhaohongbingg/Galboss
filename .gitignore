@@ -22,14 +22,21 @@ out/
 run/
 
 # ---------------------------------------------------------------- Blockbench / MCP 中间产物
+# 建模流水线在 tools/blockbench/（开发工具，不是 mod 内容，所以不放在 src/ 下）。
 # 这些都是可重建的：session.json 每次重启失效，_state*.txt 是回写流程的临时输出，
 # _preview/ 由 pipeline.mjs shot 与 verify_anims.mjs 生成。
-# 注意不要忽略 blockbench/textures/*_armed.png 与 blockbench/ref/ —— 它们是流水线的输入。
-blockbench/session.json
-blockbench/_state*.txt
-blockbench/_preview/
-blockbench/_backup_*/
-blockbench/_archive_*/
+# 注意不要忽略 tools/blockbench/textures/*_armed.png 与 tools/blockbench/ref/ ——
+# 它们是流水线的输入（模型贴图源），删了就没法重新导出模型。
+tools/blockbench/session.json
+tools/blockbench/_state*.txt
+tools/blockbench/_preview/
+tools/blockbench/_backup_*/
+tools/blockbench/_archive_*/
+
+# ---------------------------------------------------------------- 开发工具与 AI 配置
+# .codebuddy/ 是 CodeBuddy 的本机配置（skills / 记忆），跟 mod 本身没有任何关系，
+# 不该出现在 mod 仓库里。与 tools/blockbench/ 不同 —— 那个是模型的唯一来源，要留。
+.codebuddy/
 
 # ---------------------------------------------------------------- 系统文件
 Thumbs.db

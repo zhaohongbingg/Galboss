@@ -20,7 +20,7 @@ import software.bernie.geckolib.renderer.layer.BlockAndItemGeoLayer;
  *   3. 单贴图限制 —— 物品有自己的贴图系统，不需要合成图集
  *
  * 握持姿态与缩放改在 models/item/ikuko_katana.json 的 display 块里调
- * （由 blockbench/geo_to_item_model.mjs 生成，别手改那个文件）。
+ * （由 tools/blockbench/geo_to_item_model.mjs 生成，别手改那个文件）。
  *
  * ---------------------------------------------------------------------------
  * 这一层拿到的 PoseStack 到底是什么状态（核对过 GeckoLib 4.4.2 源码，别再猜）：
@@ -49,7 +49,7 @@ import software.bernie.geckolib.renderer.layer.BlockAndItemGeoLayer;
  *   （BakedModelFactory 的 `updatePivot(-pivot.x, ...)` 与 `origin = -(origin.x + size.x)`），
  *   两者被同样处理，所以「符号相同」在任何坐标系里都成立。曾经把挂点写成 +6，
  *   看着像「手心」其实是**另一条手臂**的位置：武器悬在身体另一侧，手臂摆动时还在旁边乱晃。
- *   修正脚本：`blockbench/fix_weapon_anchor_side.mjs`。
+ *   修正脚本：`tools/blockbench/fix_weapon_anchor_side.mjs`。
  *
  *   枢轴在手心 = 手臂动画一动它就跟着动，武器因此固定在手上。
  *
@@ -64,7 +64,7 @@ import software.bernie.geckolib.renderer.layer.BlockAndItemGeoLayer;
  *     - weapon_anchor             —— 只决定"握在哪儿"，rotation 必须保持 0。
  *
  *   当前用到 right_hand 的动画：郁子的 attack / combo / cast（转腕摆刀身）、
- *   礼的 shoot / combo（后坐枪口上跳、枪托朝下）。定义在 blockbench/anims.mjs 的 CHARACTER_ANIMS。
+ *   礼的 shoot / combo（后坐枪口上跳、枪托朝下）。定义在 tools/blockbench/anims.mjs 的 CHARACTER_ANIMS。
  *
  *   物品侧还要满足一个约定：**握把要落在物品模型空间的中心 (8,8,8)**。
  *   原版物品渲染会先绕模型中心做 display 的旋转/缩放，再 T(-0.5,-0.5,-0.5)，

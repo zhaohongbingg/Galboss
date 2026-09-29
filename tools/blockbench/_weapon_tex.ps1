@@ -1,6 +1,7 @@
 Add-Type -AssemblyName System.Drawing
 
-$root = "d:\game\mc\bossmod\blockbench\textures"
+# 路径从脚本自身位置推导：$PSScriptRoot = tools/blockbench，不再写死盘符。
+$root = Join-Path $PSScriptRoot 'textures'
 
 function C($hex) {
     $r = [Convert]::ToInt32($hex.Substring(0, 2), 16)

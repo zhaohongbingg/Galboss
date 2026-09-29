@@ -1,0 +1,18 @@
+# ---------------------------------------------------------------- 换行符
+# 仓库内统一按 LF 存放，工作区也检出成 LF。
+# 不这样规定的话，Windows 上每次 git add 都会刷 "LF will be replaced by CRLF"，
+# 而且跟 Linux 协作者来回提交时，diff 里会出现「整行都改了」的假改动。
+* text=auto eol=lf
+
+# .bat 是例外：cmd.exe 对 LF 结尾的批处理在 goto/call 标签处可能出问题，保持 CRLF。
+*.bat text eol=crlf
+
+# ---------------------------------------------------------------- 二进制
+# 明确标成 binary，git 就不做任何换行转换、也不尝试算文本 diff。
+*.png      binary
+*.bbmodel  binary
+*.nbt      binary
+*.ogg      binary
+*.psd      binary
+*.jar      binary
+*.zip      binary

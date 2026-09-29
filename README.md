@@ -139,10 +139,10 @@ gradlew.bat build          # 产物在 build/libs/
 
 ## 模型与动画
 
-模型、贴图、动画**全部由脚本生成**，完整流程与踩坑记录见 **[`blockbench/README.md`](blockbench/README.md)**。
+模型、贴图、动画**全部由脚本生成**，完整流程与踩坑记录见 **[`tools/blockbench/README.md`](tools/blockbench/README.md)**。
 
 > ⚠ **不要手改 `assets/galboss/geo/*.geo.json` 与 `assets/galboss/animations/*.animation.json`** ——
-> 它们由 `blockbench/pipeline.mjs` 与 `build_all_anims.mjs` 产出，手改会在下次重建时被覆盖。
+> 它们由 `tools/blockbench/pipeline.mjs` 与 `build_all_anims.mjs` 产出，手改会在下次重建时被覆盖。
 > 要改就改定义文件，重跑脚本。
 
 要点：
@@ -155,7 +155,7 @@ gradlew.bat build          # 产物在 build/libs/
 - 离线自检（不依赖 Blockbench）：
 
 ```powershell
-node blockbench/pipeline.mjs --check
+node tools/blockbench/pipeline.mjs --check
 ```
 
 ## 项目结构
@@ -199,27 +199,24 @@ src/main/resources/
     └── structures/             教学楼
 ```
 
-## 开发辅助：GeckoLib 动画规范 skill
+根目录只放标准 mod project 该有的东西（`build.gradle` / `gradle.properties` / `gradlew.bat` /
+`settings.gradle` / `src/` + `.gitignore` / `.gitattributes` / `README.md`）。模型流水线这类
+开发工具统一收在 `tools/`：
 
-`.codebuddy/skills/geckolib-character-animation/` —— 把本项目的动画经验固化成的规范与工具：
-
-- `SKILL.md` —— 骨骼命名模板、动画 JSON 规范、Molang 程序化循环、控制器分层、时长档位、
-  时序编排、12 条反模式清单
-- `references/format-and-api.md` —— 格式细节、导出时的符号转换、UV 分段的数学、GeckoLib 4.x API
-- `references/case-studies.md` —— 三个生产模组的实测数据与横向对比
-- `scripts/check_animation.py` —— 静态校验器（骨骼名、关键帧越界、循环首尾、死骨头、帧网格）
-
-```bash
-python .codebuddy/skills/geckolib-character-animation/scripts/check_animation.py \
-    src/main/resources/assets/galboss/geo/reizein_tohka.geo.json \
-    src/main/resources/assets/galboss/animations/*.animation.json
+```
+tools/blockbench/                开发工具，不参与打包（gradlew build 出来的 jar 里没有它）
+├── pipeline.mjs                 建模 / 动画主流程（make / rig / shot / export）
+├── anims.mjs                    关键帧定义 —— 唯一需要手改的文件
+├── *.bbmodel                    Blockbench 工程源文件（模型的唯一来源）
+├── textures/  ref/              流水线输入：武器色板、参考图
+└── README.md                    完整流程与踩坑记录
 ```
 
 ## 已知事项
 
 - **`run/` 不在仓库里**（`.gitignore` 排除）。教学楼结构体已随仓库提供
   （`data/galboss/structures/school_building.nbt`）；要改它得先 `/place template` 放回世界、
-  改完再用 `blockbench/export_structure.mjs` 重新导出。
+  改完再用 `tools/blockbench/export_structure.mjs` 重新导出。
 - **郁子武士刀的 `katana` 骨骼在 Blockbench 视口里不显示**（礼的手枪正常）。项目数据、场景图、
   导出的 geo 都验证过是完整正确的，游戏里渲染正常 —— 别为此重新建模。
 - `mods.toml` 里声明的是 MIT，但仓库里目前还没有 `LICENSE` 文件。

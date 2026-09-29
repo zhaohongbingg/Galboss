@@ -1,7 +1,9 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import { initialize, callTool } from './_mcp_client.mjs';
 
-const HERE = 'd:/game/mc/bossmod/blockbench';
+// 从脚本自身位置推导，不写死盘符（原因见 pipeline.mjs 顶部说明）。
+const HERE = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
 const textOf = (res) => {
   const c = res?.result?.content;
   return Array.isArray(c) ? c.map((x) => x.text ?? JSON.stringify(x)).join('\n') : JSON.stringify(res);

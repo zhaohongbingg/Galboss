@@ -3,9 +3,11 @@ import path from 'node:path';
 import { initialize, callTool, rpc } from './_mcp_client.mjs';
 import { ANIMS, CHARACTER_ANIMS, CHARACTER_IDS, animsFor, overriddenNames } from './anims.mjs';
 
+// 路径全部从脚本自身位置推导，不写死盘符 —— 目录整体搬家（blockbench/ → tools/blockbench/）
+// 之后不需要动这里。HERE = 本文件所在目录 = tools/blockbench。
 const HERE = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
-const BB_ROOT = 'd:/game/mc/bossmod/blockbench';
-const MOD_ROOT = 'd:/game/mc/bossmod/src/main/resources/assets/galboss';
+const BB_ROOT = HERE;
+const MOD_ROOT = path.resolve(HERE, '../../src/main/resources/assets/galboss');
 
 // ---------------------------------------------------------------- base rig (v2)
 // 原版玩家比例 + 原版 64x64 皮肤 UV。v2 相对 v1 的三处结构性修正：
