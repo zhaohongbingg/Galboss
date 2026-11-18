@@ -1,0 +1,40 @@
+{
+ "slug": "epitaph_lightning_bolt",
+ "pixelfxId": "lightning/lightning-strike",
+ "texture": "galboss:textures/fx/epitaph_lightning_bolt",
+ "lightTexture": "galboss:textures/fx/epitaph_lightning_bolt_light",
+ "frameW": 231,
+ "frameH": 262,
+ "cols": 8,
+ "rows": 8,
+ "frames": 61,
+ "fps": 20,
+ "loop": false,
+ "durationTicks": 61,
+ "pivot": {
+  "x": 115,
+  "y": 227
+ },
+ "anchor": "billboard",
+ "defaultScale": 0.025,
+ "palette": [
+  "#1c1206",
+  "#3a2408",
+  "#6b410c",
+  "#9c5f12",
+  "#cc8420",
+  "#ffb347",
+  "#ffd98a",
+  "#fff4d6"
+ ],
+ "source": {
+  "repo": "https://github.com/patch-gg/pixelfx",
+  "license": "MIT",
+  "effect": "lightning/lightning-strike",
+  "seed": 21,
+  "adaptedFrom": "Hugo Duprez / Sprite Fusion (MIT), Hollow Crown (MIT)，见 NOTICE.md"
+ },
+ "premultiplied": true,
+ "lightStrength": 2.4,
+ "tint": "#ffd191"
+}

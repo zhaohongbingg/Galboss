@@ -23,6 +23,15 @@ license="${mod_license}"
     ordering="NONE"
     side="BOTH"
 
+# JEI 是可选联动（送礼表 / 货架在 JEI 里的两个查询分类）。
+# mandatory=false：没装 JEI 时本模组照常工作，只是少两个 JEI 分类。
+[[dependencies.galboss]]
+    modId="jei"
+    mandatory=false
+    versionRange="[15,)"
+    ordering="AFTER"
+    side="CLIENT"
+
 [[mods]]
     modId="${mod_id}"
     version="${mod_version}"

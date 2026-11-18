@@ -31,12 +31,21 @@ public class ModCreativeTabs {
                         output.accept(ModItems.REIZEIN_TOHKA_SPAWN_EGG.get());
                         output.accept(ModItems.TADASUGAWA_REI_SPAWN_EGG.get());
                         output.accept(ModItems.ONABUTA_IKUKO_SPAWN_EGG.get());
+                        output.accept(ModItems.BEATRICE_SPAWN_EGG.get());
+                        // 郁子召唤的黑山羊仆从（只用于创造 / 调试）
+                        output.accept(ModItems.BLACK_GOAT_SERVANT_SPAWN_EGG.get());
                         // 终局奖励
                         output.accept(ModItems.TOHKA_BADGE.get());
                         output.accept(ModItems.REI_ARMBAND.get());
                         output.accept(ModItems.IKUKO_MEDAL.get());
                         output.accept(ModItems.FS_BIG_THREE_CORE.get());
                         output.accept(ModItems.FS_BADGE.get());
+                        // 棋盘竞技场的不可破坏方块（结构自带，也可手工搭）
+                        output.accept(ModItems.ARENA_STONE.get());
+                        output.accept(ModItems.ARENA_DEEPSLATE.get());
+                        output.accept(ModItems.ARENA_GRAY.get());
+                        output.accept(ModItems.ARENA_WHITE.get());
+                        output.accept(ModItems.ARENA_BLACK.get());
                     })
                     .build());
 
@@ -63,12 +72,15 @@ public class ModCreativeTabs {
                 event.accept(ModItems.REIZEIN_TOHKA_SPAWN_EGG.get());
                 event.accept(ModItems.TADASUGAWA_REI_SPAWN_EGG.get());
                 event.accept(ModItems.ONABUTA_IKUKO_SPAWN_EGG.get());
+                event.accept(ModItems.BEATRICE_SPAWN_EGG.get());
+                event.accept(ModItems.BLACK_GOAT_SERVANT_SPAWN_EGG.get());
                 return;
             }
             // 手持武器进「战斗」页签（它们也是实际物品，顺便方便查看模型）
             if (CreativeModeTabs.COMBAT.equals(event.getTabKey())) {
                 event.accept(ModItems.IKUKO_KATANA.get());
                 event.accept(ModItems.REI_GUN.get());
+                event.accept(ModItems.BEATRICE_PIPE.get());
             }
         }
     }

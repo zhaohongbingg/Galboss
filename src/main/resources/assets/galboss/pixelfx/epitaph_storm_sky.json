@@ -1,0 +1,39 @@
+{
+ "slug": "epitaph_storm_sky",
+ "pixelfxId": "lightning/storm-cloud",
+ "texture": "galboss:textures/fx/epitaph_storm_sky",
+ "lightTexture": "galboss:textures/fx/epitaph_storm_sky_light",
+ "frameW": 161,
+ "frameH": 174,
+ "cols": 12,
+ "rows": 4,
+ "frames": 40,
+ "fps": 20,
+ "loop": true,
+ "durationTicks": 40,
+ "pivot": {
+  "x": 81,
+  "y": 163
+ },
+ "anchor": "billboard",
+ "defaultScale": 0.027,
+ "palette": [
+  "#120a1e",
+  "#241238",
+  "#3f1f5e",
+  "#5c2f86",
+  "#7d49b0",
+  "#a471d8",
+  "#d3aef5",
+  "#f4e6ff"
+ ],
+ "source": {
+  "repo": "https://github.com/patch-gg/pixelfx",
+  "license": "MIT",
+  "effect": "lightning/storm-cloud",
+  "seed": 24,
+  "adaptedFrom": "Hugo Duprez / Sprite Fusion (MIT), Hollow Crown (MIT)，见 NOTICE.md"
+ },
+ "tint": "#b192d0",
+ "lightStrength": 2.6
+}

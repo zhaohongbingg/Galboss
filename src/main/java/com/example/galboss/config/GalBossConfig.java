@@ -2,6 +2,8 @@ package com.example.galboss.config;
 
 import net.minecraftforge.common.ForgeConfigSpec;
 
+import java.util.List;
+
 /**
  * 通用配置（服务端 + 客户端一致即可，落在 {@code config/galboss-common.toml}）。
  *
@@ -39,7 +41,76 @@ public final class GalBossConfig {
      */
     public static final ForgeConfigSpec.IntValue DAMAGE_CAP_PER_HIT;
 
+    // -------------------------------------------------------------- 宠物养成
+    //
+    // 礼物表与货架都做成字符串列表，改数值不用重新编译：
+    //   礼物   "物品ID=好感度"                      例 "minecraft:golden_apple=8"
+    //   偏爱   "搭档=物品ID"                        例 "tohka=minecraft:cake"
+    //   商品   "商品ID 数量 货币ID 价格 解锁好感度"   例 "minecraft:book 3 minecraft:emerald 2 0"
+    // 搭档可写 tohka / rei / ikuko，也可以写完整实体名 reizein_tohka 等。
+    // 解析失败的行会被跳过并写一条 warn 日志，不会让整个配置加载失败。
+
+    /** 礼物表：物品 → 基础好感度。不在表里的物品一律不算礼物。 */
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> PET_GIFT_VALUES;
+
+    /** 每个搭档最喜欢的东西，加成 = 基础值 / 2 + 2。 */
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> PET_GIFT_FAVORITES;
+
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> PET_TRADES_TOHKA;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> PET_TRADES_REI;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> PET_TRADES_IKUKO;
+
     public static final ForgeConfigSpec SPEC;
+
+    // ------------------------------------------------------------- 默认值表
+    //
+    // 必须声明在下面的 static 块之前：Java 按书写顺序执行静态初始化。
+
+    private static final List<String> DEFAULT_GIFT_VALUES = List.of(
+            "minecraft:sweet_berries=2",
+            "minecraft:glow_berries=2",
+            "minecraft:cookie=3",
+            "minecraft:gold_ingot=3",
+            "minecraft:amethyst_shard=3",
+            "minecraft:honey_bottle=4",
+            "minecraft:emerald=5",
+            "minecraft:diamond=6",
+            "minecraft:cake=7",
+            "minecraft:golden_apple=8",
+            "minecraft:enchanted_golden_apple=15"
+    );
+
+    private static final List<String> DEFAULT_GIFT_FAVORITES = List.of(
+            "tohka=minecraft:cake",
+            "rei=minecraft:honey_bottle",
+            "ikuko=minecraft:golden_apple"
+    );
+
+    private static final List<String> DEFAULT_TRADES_TOHKA = List.of(
+            "minecraft:book 3 minecraft:emerald 2 0",
+            "minecraft:paper 16 minecraft:emerald 3 30",
+            "minecraft:golden_apple 1 minecraft:emerald 9 60",
+            "galboss:fs_big_three_core 1 minecraft:emerald 32 90"
+    );
+
+    private static final List<String> DEFAULT_TRADES_REI = List.of(
+            "minecraft:arrow 16 minecraft:emerald 2 0",
+            "minecraft:iron_ingot 6 minecraft:emerald 5 30",
+            "minecraft:diamond 1 minecraft:emerald 8 60",
+            "galboss:fs_badge 1 minecraft:emerald 40 90"
+    );
+
+    private static final List<String> DEFAULT_TRADES_IKUKO = List.of(
+            "minecraft:cooked_beef 8 minecraft:emerald 3 0",
+            "minecraft:iron_sword 1 minecraft:emerald 4 30",
+            "minecraft:diamond_sword 1 minecraft:emerald 16 60",
+            "galboss:ikuko_katana 1 minecraft:emerald 32 90"
+    );
+
+    /** 宽松校验：只挡明显不是字符串的项，真正的解析留给 PetGiftTable / PetTradeTable 做。 */
+    private static boolean isNonBlankString(Object value) {
+        return value instanceof String text && !text.isBlank();
+    }
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -67,6 +138,43 @@ public final class GalBossConfig {
                 .comment("Hard cap applied to a single hit of damage (after all multipliers).",
                         "Set to 0 or below to disable. /kill and void damage are never capped.")
                 .defineInRange("perHit", 100, 0, 1_000_000);
+        builder.pop();
+
+        builder.push("pet_gift");
+
+        PET_GIFT_VALUES = builder
+                .comment("Gift table entries: \"<item>=<affection>\". Items not listed here are not gifts.",
+                        "Example: \"minecraft:golden_apple=8\"")
+                .defineListAllowEmpty(List.of("giftValues"), DEFAULT_GIFT_VALUES,
+                        GalBossConfig::isNonBlankString);
+
+        PET_GIFT_FAVORITES = builder
+                .comment("Favourite gift of each partner: \"<partner>=<item>\".",
+                        "A favourite gains base / 2 + 2 extra affection.",
+                        "Partners: tohka / rei / ikuko (or the full entity id, e.g. reizein_tohka).")
+                .defineListAllowEmpty(List.of("giftFavorites"), DEFAULT_GIFT_FAVORITES,
+                        GalBossConfig::isNonBlankString);
+
+        builder.pop();
+
+        builder.push("pet_trade");
+
+        PET_TRADES_TOHKA = builder
+                .comment("Tohka's shop entries: \"<result> <count> <currency> <price> <unlockAffection>\".",
+                        "Example: \"minecraft:book 3 minecraft:emerald 2 0\"")
+                .defineListAllowEmpty(List.of("tohkaTrades"), DEFAULT_TRADES_TOHKA,
+                        GalBossConfig::isNonBlankString);
+
+        PET_TRADES_REI = builder
+                .comment("Rei's shop entries, same format as tohkaTrades.")
+                .defineListAllowEmpty(List.of("reiTrades"), DEFAULT_TRADES_REI,
+                        GalBossConfig::isNonBlankString);
+
+        PET_TRADES_IKUKO = builder
+                .comment("Ikuko's shop entries, same format as tohkaTrades.")
+                .defineListAllowEmpty(List.of("ikukoTrades"), DEFAULT_TRADES_IKUKO,
+                        GalBossConfig::isNonBlankString);
+
         builder.pop();
 
         SPEC = builder.build();

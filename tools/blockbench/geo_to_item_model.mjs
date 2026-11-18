@@ -41,7 +41,7 @@ import path from 'node:path';
 // ===================================================================
 
 const HERE = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
-const RES = path.join(HERE, '..', 'src', 'main', 'resources', 'assets', 'galboss');
+const RES = path.join(HERE, '..', '..', 'src', 'main', 'resources', 'assets', 'galboss');
 
 const [srcGeo, outModel, texName, scaleArg, gripArg] = [
   process.argv[2],
@@ -57,9 +57,15 @@ if (!srcGeo || !outModel || !texName) {
 }
 
 const SCALE = scaleArg ? Number(scaleArg) : 0.45;
-const TEX_SIZE = Number(process.env.TEX_SIZE || 512);
+// TEX_SIZE 支持 "512"（正方形）与 "128x64"（非正方形：烟斗的图集就是 128x64）。
+// 原版 uv 的单位是「整张贴图的 1/16」，u / v 两个轴各按自己的贴图边长归一化，
+// 所以非正方形贴图不能只给一个边长 —— 枪和刀都是正方形贴图，历史上才只需要一个数。
+const TEX = (process.env.TEX_SIZE || '512').split('x').map(Number);
+const TEX_W = TEX[0];
+const TEX_H = TEX[1] ?? TEX[0];
 /** geo 的 uv 是「贴图像素」，item model 的 uv 是「整张贴图的 1/16」。 */
-const UV = 16 / TEX_SIZE;
+const UV_U = 16 / TEX_W;
+const UV_V = 16 / TEX_H;
 
 const geo = JSON.parse(fs.readFileSync(path.join(RES, 'geo', srcGeo), 'utf8'));
 const g = geo['minecraft:geometry'][0];
@@ -71,7 +77,7 @@ for (const b of bones) {
   if (b.cubes) cubes.push(...b.cubes);
 }
 console.log(`源: ${srcGeo}  ->  ${cubes.length} 个立方体`);
-console.log(`贴图: ${texName} ${TEX_SIZE}x${TEX_SIZE}  uv 换算系数 ${UV}  缩放 ${SCALE}`);
+console.log(`贴图: ${texName} ${TEX_W}x${TEX_H}  uv 换算系数 u=${UV_U} v=${UV_V}  缩放 ${SCALE}`);
 
 // 拍平是以「cube 的绝对坐标」为前提的，骨骼旋转不会被重建 —— 非零就要提醒
 const boneRot = bones.filter((b) => b.rotation && b.rotation.some((v) => v !== 0));
@@ -113,12 +119,23 @@ const map = (value, i) => {
   return Math.round((8 + rel * SCALE) * 1000) / 1000;
 };
 
-const uv16 = (v) => Math.round(v * UV * 1000) / 1000;
+const uvU = (v) => Math.round(v * UV_U * 1000) / 1000;
+const uvV = (v) => Math.round(v * UV_V * 1000) / 1000;
 
 const FACES = ['north', 'south', 'east', 'west', 'up', 'down'];
 let negativeUv = 0;
 let rotated = 0;
 const multiAxis = [];
+/**
+ * 原版 `BlockElement.Deserializer.getAngle` 只认 **0 / ±22.5 / ±45**，别的角度会让
+ * **整个模型反序列化抛异常** —— 表现不是「某面歪了」，而是模型根本不加载：
+ * 手上顶着一个 missing 模型的紫黑棋盘格方块。贝阿朵莉切的烟斗来自自由旋转建模
+ * （环状装饰是 0/45/90/135/… 一圈摆出来的），这些角度原版表达不了，
+ * 只能丢掉旋转、把零件退回各自轴对齐的盒子（靠重叠维持体积）。
+ */
+const LEGAL_ANGLES = new Set([0, 22.5, -22.5, 45, -45]);
+const illegalAngles = new Map();
+const noteIllegalAngle = (angle) => illegalAngles.set(angle, (illegalAngles.get(angle) ?? 0) + 1);
 
 /**
  * geo 立方体自带旋转 -> 原版 element 旋转。
@@ -132,8 +149,6 @@ const multiAxis = [];
  *   geckolib: Quaternionf().rotationXYZ(toRadians(-rx), toRadians(-ry), toRadians(rz))
  *   原版    : new Quaternionf().rotationAxis(toRadians(angle), axis)，origin = pivot
  * 所以单轴时 angle = rx * -1 / ry * -1 / rz * +1；pivot 走和几何一样的 map()。
- * 原版只接受 0 / ±22.5 / ±45（BlockElement.Deserializer.getAngle 会直接抛异常），
- * 而 geo 里正好只有这几个值。
  */
 function toElementRotation(c, warn) {
   const r = c.rotation;
@@ -146,12 +161,20 @@ function toElementRotation(c, warn) {
   }
   const i = nz[0];
   const axis = 'xyz'[i];
+  // 归一到 (-180, 180] 再判定是否落在原版允许的档位上
+  let angle = r[i] * (axis === 'z' ? 1 : -1);
+  angle = ((angle % 360) + 540) % 360 - 180;
+  angle = angle === -180 ? 180 : Math.round(angle * 1000) / 1000;
+  if (!LEGAL_ANGLES.has(angle)) {
+    noteIllegalAngle(angle);
+    return undefined;
+  }
   const pivot = c.pivot ?? [0, 0, 0];
   rotated++;
   return {
     origin: [map(pivot[0], 0), map(pivot[1], 1), map(pivot[2], 2)],
     axis,
-    angle: r[i] * (axis === 'z' ? 1 : -1)
+    angle
   };
 }
 
@@ -178,7 +201,7 @@ const elements = cubes.map((c) => {
     if (w < 0 || h < 0) negativeUv++;
     // 直接搬：uv 矩形左上角 + 尺寸。uv_size 为负时保留（原版用 [u0,v0,u1,v1] 四点，
     // 允许 u0>u1，天然表示镜像，不需要归一化）。
-    faces[f] = { uv: [uv16(u), uv16(v), uv16(u + w), uv16(v + h)], texture: '#0' };
+    faces[f] = { uv: [uvU(u), uvV(v), uvU(u + w), uvV(v + h)], texture: '#0' };
   }
 
   const element = { from: lo, to: hi, faces };
@@ -218,6 +241,17 @@ const DISPLAY = {
     thirdperson_lefthand: { rotation: [0, 0, 0], scale: [1, 1, 1] },
     firstperson_righthand: { rotation: [0, 0, 0], translation: [1.13, 3.2, 1.13], scale: [0.68, 0.68, 0.68] },
     firstperson_lefthand: { rotation: [0, 0, 0], translation: [1.13, 3.2, 1.13], scale: [0.68, 0.68, 0.68] }
+  },
+  // 烟斗：长轴沿 X（geo 空间里斗在 +X 端、嘴含的那头在 -X 端），物品空间 x 又被取反，
+  //   所以斗落在 -X 侧、嘴那头在 +X 侧。握把定在靠嘴那段的杆上，模型从手心往前伸出去。
+  //   绕 Y 转 -90°：R_y(-90) 把 -X 轴甩到 -Z（角色正面），于是斗朝前、杆收进手心。
+  //   GUI 图标不转 —— 长轴本来就在画面横向上，正好是侧视剪影。
+  'beatrice_pipe.json': {
+    guiRotation: [0, 0, 0],
+    thirdperson_righthand: { rotation: [0, -90, 0], scale: [1, 1, 1] },
+    thirdperson_lefthand: { rotation: [0, -90, 0], scale: [1, 1, 1] },
+    firstperson_righthand: { rotation: [0, -90, 0], translation: [1.13, 3.2, 1.13], scale: [0.68, 0.68, 0.68] },
+    firstperson_lefthand: { rotation: [0, -90, 0], translation: [1.13, 3.2, 1.13], scale: [0.68, 0.68, 0.68] }
   }
 };
 
@@ -283,6 +317,11 @@ if (rotated) console.log(`立方体自带旋转: ${rotated} 个已转成原版 e
 if (multiAxis.length) {
   console.log(`⚠ 有 ${multiAxis.length} 个立方体是多轴旋转，原版一个 element 只能绕单轴，已忽略: ${[...new Set(multiAxis)].join(' ')}`);
 }
+if (illegalAngles.size) {
+  const total = [...illegalAngles.values()].reduce((a, b) => a + b, 0);
+  console.log(`⚠ 有 ${total} 个立方体的旋转不在原版合法档位（0/±22.5/±45），已丢掉旋转、保留轴对齐盒子（否则整个模型加载失败、手上只剩 missing 方块）: `
+    + [...illegalAngles.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}°×${v}`).join(' '));
+}
 
 const display = {
   ...preset,
@@ -295,7 +334,7 @@ for (const [k, v] of Object.entries(display)) {
 
 const model = {
   credit: `generated from ${srcGeo} by geo_to_item_model.mjs —— uv 已换算到 0..16 归一化空间（原版忽略 texture_size，见脚本注释）`,
-  texture_size: [TEX_SIZE, TEX_SIZE],
+  texture_size: [TEX_W, TEX_H],
   gui_light: 'front',
   textures: { '0': `galboss:item/${texName}`, particle: `galboss:item/${texName}` },
   elements,

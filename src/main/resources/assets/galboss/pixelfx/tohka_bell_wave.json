@@ -1,0 +1,39 @@
+{
+ "slug": "tohka_bell_wave",
+ "pixelfxId": "impacts/ground-slam",
+ "texture": "galboss:textures/fx/tohka_bell_wave",
+ "lightTexture": "galboss:textures/fx/tohka_bell_wave_light",
+ "frameW": 248,
+ "frameH": 184,
+ "cols": 8,
+ "rows": 6,
+ "frames": 45,
+ "fps": 20,
+ "loop": false,
+ "durationTicks": 45,
+ "pivot": {
+  "x": 125,
+  "y": 141
+ },
+ "anchor": "ground",
+ "defaultScale": 0.021,
+ "palette": [
+  "#241703",
+  "#4a2c08",
+  "#7d4a0e",
+  "#b87417",
+  "#e0a12b",
+  "#ffd25a",
+  "#fff0a8",
+  "#ffffff"
+ ],
+ "source": {
+  "repo": "https://github.com/patch-gg/pixelfx",
+  "license": "MIT",
+  "effect": "impacts/ground-slam",
+  "seed": 12,
+  "adaptedFrom": "Hugo Duprez / Sprite Fusion (MIT), Hollow Crown (MIT)，见 NOTICE.md"
+ },
+ "lightStrength": 1.9,
+ "tint": "#ecc780"
+}

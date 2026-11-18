@@ -139,6 +139,26 @@ public abstract class AbstractFSBossEntity extends Monster implements GeoEntity 
         this.setPersistenceRequired();
     }
 
+    /**
+     * 和平难度下也不消失。
+     *
+     * <p>{@link #setPersistenceRequired()} <b>管不到和平难度</b>。{@code Mob#checkDespawn}
+     * 的判定顺序是（已对原版字节码确认）：
+     * <pre>
+     *   1. difficulty == PEACEFUL &amp;&amp; shouldDespawnInPeaceful()  → discard()    ← 先走这条
+     *   2. isPersistenceRequired() || requiresCustomPersistence()  → 跳过后续判定
+     * </pre>
+     * 和平分支在持久化检查<b>之前</b>，而 {@code Monster} 的默认实现返回 {@code true}。
+     * 结果是玩家中途把难度切成和平，boss 会被静默 {@code discard()} —— 战利品和进度一起没。
+     *
+     * <p>代价：和平难度下她仍然会攻击。对 boss 来说这比「打到一半人凭空消失」可接受；
+     * 想让和平难度直接清场，把这里改回 {@code return true} 即可。
+     */
+    @Override
+    protected boolean shouldDespawnInPeaceful() {
+        return false;
+    }
+
     // ------------------------------------------------------------------ 子类契约
 
     /** 本 boss 在三人组里的身份。 */
@@ -309,6 +329,17 @@ public abstract class AbstractFSBossEntity extends Monster implements GeoEntity 
                 this.startBattle();
             }
         }
+    }
+
+    /**
+     * 调试入口：绕过右键对话直接进入战斗（{@code /galboss battle} 用）。
+     *
+     * <p>正式流程里开战由 {@code mobInteract} 右键触发；自动化验证（mcdev probe）没有右键
+     * 通道，所以把 {@link #startBattle()} 暴露成一个显式方法，战斗逻辑本身完全复用，
+     * 不改变任何正式行为。
+     */
+    public void debugStartBattle() {
+        this.startBattle();
     }
 
     /** 进入战斗：锁定人数、缩放生命、亮血条。 */

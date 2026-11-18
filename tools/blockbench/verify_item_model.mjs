@@ -15,7 +15,7 @@ import zlib from 'node:zlib';
 //      不带参数时检查 models/item 下所有由 geo_to_item_model.mjs 生成了 credit 的模型
 
 const HERE = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
-const RES = path.join(HERE, '..', 'src', 'main', 'resources', 'assets', 'galboss');
+const RES = path.join(HERE, '..', '..', 'src', 'main', 'resources', 'assets', 'galboss');
 
 // ---------------------------------------------------------------- 极简 PNG 解码
 // 只支持 8bit、非隔行的 RGB/RGBA（本项目的武器贴图都是这种）

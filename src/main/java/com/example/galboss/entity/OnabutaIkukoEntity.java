@@ -1,6 +1,8 @@
 package com.example.galboss.entity;
 
 import com.example.galboss.effect.ModEffects;
+import com.example.galboss.fx.PixelfxSlugs;
+import com.example.galboss.fx.PixelfxFx;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
@@ -33,6 +35,7 @@ import java.util.UUID;
  *  - 「一番队突击」：蓄力 0.8 秒后冲刺，命中 20 伤害 + 极强击退 + 流血 5 秒
  *  - 「乱战」：5 秒狂乱，攻速 +50% 但伤害 -25%，期间随机换目标
  *  - 「战斗狂欢」：Rage +2、力量 II 与速度 II 各 8 秒，并震荡周围 8 格玩家
+ *  - 「深渊召唤」：战斗中定期召出 2 只黑山羊仆从（场上她召唤的羊少于 3 只时才补）
  *  - P2「一番队・全力」：Rage 直接拉满、攻击 +35%、攻速 +30%，但护甲 -5
  */
 public class OnabutaIkukoEntity extends AbstractFSBossEntity {
@@ -60,6 +63,17 @@ public class OnabutaIkukoEntity extends AbstractFSBossEntity {
     private static final double CARNIVAL_RADIUS = 8.0;
     private static final float CARNIVAL_DAMAGE = 8.0f;
 
+    // 深渊召唤（黑山羊仆从）
+    // 第一次 30 秒、之后每 40 秒；场上她召唤的黑山羊少于 3 只时才补 2 只。
+    // 她死亡后不需要手动清理：黑山羊每 20 tick 检查召唤者存活，召唤者一死就自行 discard。
+    private static final double GOAT_SUMMON_FIRST = 30.0;
+    private static final double GOAT_SUMMON_CD = 40.0;
+    private static final int GOAT_SUMMON_COUNT = 2;
+    private static final int GOAT_MAX_ALIVE = 3;
+    private static final double GOAT_SUMMON_RADIUS_MIN = 2.0;
+    private static final double GOAT_SUMMON_RADIUS_MAX = 4.0;
+    private static final String GOAT_SUMMON_MSG = "message.galboss.ikuko.goat_summon";
+
     // P2
     private static final double PHASE2_HEALTH = 0.30;
     private static final double PHASE2_ARMOR_PENALTY = -5.0;
@@ -76,11 +90,14 @@ public class OnabutaIkukoEntity extends AbstractFSBossEntity {
     private int brawlCd = 0;
     private int carnivalCd = 0;
     private int brawlTicks = 0;
+    private int goatSummonTimer;
     private boolean phase2 = false;
     private boolean lifestealAnnounced = false;
 
     public OnabutaIkukoEntity(EntityType<? extends Monster> type, Level level) {
         super(type, level);
+        // 召唤计时从「进战斗 30 秒」开始算（tickBoss 只在 battleActive 后才跑）
+        this.goatSummonTimer = cd(GOAT_SUMMON_FIRST);
     }
 
     public static AttributeSupplier.Builder createAttributes() {
@@ -210,6 +227,9 @@ public class OnabutaIkukoEntity extends AbstractFSBossEntity {
         boolean hit = super.doHurtTarget(target);
         if (hit) {
             applyLifesteal((float) this.getAttributeValue(Attributes.ATTACK_DAMAGE));
+            // pixelfx：刀锋相交（她的近战命中）→ 天青格挡闪光（billboard 锚点）
+            PixelfxFx.play(this.level(), target.position().add(0.0, 1.0, 0.0),
+                    PixelfxSlugs.IKUKO_PARRY_FLASH);
         }
         return hit;
     }
@@ -254,6 +274,14 @@ public class OnabutaIkukoEntity extends AbstractFSBossEntity {
         updateRage();
         checkPhase2();
         announceLifesteal();
+
+        // 深渊召唤：计时到 0 后每 tick 尝试一次；场上够 3 只就停在这里等补位
+        if (this.goatSummonTimer > 0) {
+            this.goatSummonTimer--;
+        }
+        if (this.goatSummonTimer <= 0) {
+            summonGoatServants();
+        }
 
         if (brawlCd <= 0) {
             brawlCd = cd(BRAWL_CD);
@@ -308,6 +336,39 @@ public class OnabutaIkukoEntity extends AbstractFSBossEntity {
     }
 
     // -------------------------------------------------------------------- 技能
+
+    /** 深渊召唤：以她为中心 2~4 格随机方位召出 2 只黑山羊仆从。 */
+    private void summonGoatServants() {
+        if (BlackGoatServantEntity.countSummonedBy(this.level(), this, PARTICIPANT_RADIUS) >= GOAT_MAX_ALIVE) {
+            return;
+        }
+        boolean summoned = false;
+        for (int i = 0; i < GOAT_SUMMON_COUNT; i++) {
+            BlackGoatServantEntity goat = ModEntities.BLACK_GOAT_SERVANT.get().create(this.level());
+            if (goat == null) {
+                continue;
+            }
+            double angle = this.random.nextDouble() * Math.PI * 2.0;
+            double distance = GOAT_SUMMON_RADIUS_MIN
+                    + this.random.nextDouble() * (GOAT_SUMMON_RADIUS_MAX - GOAT_SUMMON_RADIUS_MIN);
+            double px = this.getX() + Math.cos(angle) * distance;
+            double pz = this.getZ() + Math.sin(angle) * distance;
+            goat.moveTo(px, this.getY(), pz, this.random.nextFloat() * 360f, 0.0f);
+            // 认她当召唤者：之后羊按 lifeline 跟着她，她死了羊会在 20 tick 内自行消散
+            goat.setSummoner(this);
+            goat.setTarget(this.getTarget());
+            this.level().addFreshEntity(goat);
+            summoned = true;
+        }
+        if (!summoned) {
+            return;
+        }
+        this.goatSummonTimer = cd(GOAT_SUMMON_CD);
+        playAnim("cast");
+        broadcastNearby(GOAT_SUMMON_MSG, "§5");
+        this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
+                SoundEvents.EVOKER_PREPARE_SUMMON, SoundSource.HOSTILE, 1.4f, 0.85f);
+    }
 
     /** 乱战：攻速暴涨但伤害下降，并随机换目标。 */
     private void castBrawl() {
@@ -404,6 +465,8 @@ public class OnabutaIkukoEntity extends AbstractFSBossEntity {
             if (--this.dashTicks <= 0) {
                 this.chargeTicks = 0;
                 this.dashing = false;
+                // pixelfx：突进落地（没撞到人也是一次落地）→ 天青震地波（ground 锚点）
+                PixelfxFx.play(level(), new Vec3(getX(), getY(), getZ()), PixelfxSlugs.IKUKO_QUAKE);
                 return;
             }
 
@@ -417,6 +480,8 @@ public class OnabutaIkukoEntity extends AbstractFSBossEntity {
                 applyLifesteal(ASSAULT_DAMAGE);
                 level().playSound(null, getX(), getY(), getZ(),
                         SoundEvents.PLAYER_ATTACK_CRIT, SoundSource.HOSTILE, 1.6f, 0.7f);
+                // pixelfx：撞上了人 → 冲击波落点在她脚下（ground 锚点）
+                PixelfxFx.play(level(), new Vec3(getX(), getY(), getZ()), PixelfxSlugs.IKUKO_QUAKE);
                 this.chargeTicks = 0;
                 this.dashing = false;
             }

@@ -1,0 +1,39 @@
+{
+ "slug": "rei_crit_hit",
+ "pixelfxId": "impacts/crit-hit",
+ "texture": "galboss:textures/fx/rei_crit_hit",
+ "lightTexture": "galboss:textures/fx/rei_crit_hit_light",
+ "frameW": 192,
+ "frameH": 131,
+ "cols": 10,
+ "rows": 2,
+ "frames": 19,
+ "fps": 20,
+ "loop": false,
+ "durationTicks": 19,
+ "pivot": {
+  "x": 77,
+  "y": 102
+ },
+ "anchor": "billboard",
+ "defaultScale": 0.028,
+ "palette": [
+  "#1c1206",
+  "#3a2408",
+  "#6b410c",
+  "#9c5f12",
+  "#cc8420",
+  "#ffb347",
+  "#ffd98a",
+  "#fff4d6"
+ ],
+ "source": {
+  "repo": "https://github.com/patch-gg/pixelfx",
+  "license": "MIT",
+  "effect": "impacts/crit-hit",
+  "seed": 18,
+  "adaptedFrom": "Hugo Duprez / Sprite Fusion (MIT), Hollow Crown (MIT)，见 NOTICE.md"
+ },
+ "lightStrength": 2.0,
+ "tint": "#ffd191"
+}

@@ -1,0 +1,39 @@
+{
+ "slug": "epitaph_aegis",
+ "pixelfxId": "holy/shield-aura",
+ "texture": "galboss:textures/fx/epitaph_aegis",
+ "lightTexture": "galboss:textures/fx/epitaph_aegis_light",
+ "frameW": 138,
+ "frameH": 151,
+ "cols": 14,
+ "rows": 4,
+ "frames": 48,
+ "fps": 20,
+ "loop": true,
+ "durationTicks": 48,
+ "pivot": {
+  "x": 69,
+  "y": 143
+ },
+ "anchor": "billboard",
+ "defaultScale": 0.04,
+ "palette": [
+  "#241703",
+  "#4a2c08",
+  "#7d4a0e",
+  "#b87417",
+  "#e0a12b",
+  "#ffd25a",
+  "#fff0a8",
+  "#ffffff"
+ ],
+ "source": {
+  "repo": "https://github.com/patch-gg/pixelfx",
+  "license": "MIT",
+  "effect": "holy/shield-aura",
+  "seed": 27,
+  "adaptedFrom": "Hugo Duprez / Sprite Fusion (MIT), Hollow Crown (MIT)，见 NOTICE.md"
+ },
+ "tint": "#ecc780",
+ "lightStrength": 4.0
+}

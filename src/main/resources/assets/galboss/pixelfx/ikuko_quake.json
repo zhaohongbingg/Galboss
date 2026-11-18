@@ -1,0 +1,39 @@
+{
+ "slug": "ikuko_quake",
+ "pixelfxId": "nature/quake",
+ "texture": "galboss:textures/fx/ikuko_quake",
+ "lightTexture": "galboss:textures/fx/ikuko_quake_light",
+ "frameW": 263,
+ "frameH": 82,
+ "cols": 7,
+ "rows": 9,
+ "frames": 63,
+ "fps": 20,
+ "loop": false,
+ "durationTicks": 63,
+ "pivot": {
+  "x": 132,
+  "y": 66
+ },
+ "anchor": "ground",
+ "defaultScale": 0.027,
+ "palette": [
+  "#081420",
+  "#0f2942",
+  "#1a4468",
+  "#24628f",
+  "#2f86bf",
+  "#5cb3e0",
+  "#a3dbf2",
+  "#eafaff"
+ ],
+ "source": {
+  "repo": "https://github.com/patch-gg/pixelfx",
+  "license": "MIT",
+  "effect": "nature/quake",
+  "seed": 20,
+  "adaptedFrom": "Hugo Duprez / Sprite Fusion (MIT), Hollow Crown (MIT)，见 NOTICE.md"
+ },
+ "lightStrength": 4.4,
+ "tint": "#82b6d9"
+}

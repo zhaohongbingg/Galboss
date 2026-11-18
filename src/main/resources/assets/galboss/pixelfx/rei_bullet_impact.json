@@ -1,0 +1,39 @@
+{
+ "slug": "rei_bullet_impact",
+ "pixelfxId": "impacts/bullet-impact",
+ "texture": "galboss:textures/fx/rei_bullet_impact",
+ "lightTexture": "galboss:textures/fx/rei_bullet_impact_light",
+ "frameW": 120,
+ "frameH": 73,
+ "cols": 17,
+ "rows": 2,
+ "frames": 29,
+ "fps": 20,
+ "loop": false,
+ "durationTicks": 29,
+ "pivot": {
+  "x": 88,
+  "y": 61
+ },
+ "anchor": "billboard",
+ "defaultScale": 0.03,
+ "palette": [
+  "#1c1206",
+  "#3a2408",
+  "#6b410c",
+  "#9c5f12",
+  "#cc8420",
+  "#ffb347",
+  "#ffd98a",
+  "#fff4d6"
+ ],
+ "source": {
+  "repo": "https://github.com/patch-gg/pixelfx",
+  "license": "MIT",
+  "effect": "impacts/bullet-impact",
+  "seed": 17,
+  "adaptedFrom": "Hugo Duprez / Sprite Fusion (MIT), Hollow Crown (MIT)，见 NOTICE.md"
+ },
+ "lightStrength": 2.2,
+ "tint": "#ffd191"
+}

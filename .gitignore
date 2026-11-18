@@ -41,3 +41,19 @@ tools/blockbench/_archive_*/
 # ---------------------------------------------------------------- 系统文件
 Thumbs.db
 desktop.ini
+
+# ---------------------------------------------------------------- pixelfx 导出器的校验基线
+# 可由 export-pixelfx.mjs 重新生成，体积 3MB+，不入库
+tools/pixelfx-mc/_out_check/
+
+# ---------------------------------------------------------------- pixelfx 导出器的人眼审查图
+# 由 export-pixelfx.mjs --review-only 重新生成，4MB+，不入库
+tools/pixelfx-mc/_review/
+tools/pixelfx-mc/manifest.mjs.bak
+
+# ---------------------------------------------------------------- Blockbench 会话状态
+# 每次重启失效，属于工具运行时产物
+session.json
+
+# ---------------------------------------------------------------- 生成的预览图
+tools/particle/_preview*.png

@@ -85,11 +85,40 @@ repositories {
             includeGroup("com.eliotlash.mclib")
         }
     }
+    maven {
+        // JEI 软联动用。仓库名/地址与 galtc2 完全一致 —— Gradle 的模块缓存是按仓库身份索引的，
+        // 名字对不上就会当作新仓库去联网 HEAD，而这里没网。
+        name = 'cursemaven'
+        url = 'https://cfa2.cursemaven.com'
+        content {
+            includeGroup 'curse.maven'
+        }
+    }
 }
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     implementation fg.deobf('software.bernie.geckolib:geckolib-forge-1.20.1:4.4.2')
+
+    // JEI 软联动：只在编译期 + 开发运行期存在，发布时不是前置（mods.toml 里 mandatory=false）。
+    // 运行时没装 JEI 时，com/example/galboss/compat/jei 下的类永远不会被加载。
+    //
+    // 这里优先吃 ForgeGradle 已经生成好的「反混淆后的开发用 jar」（就是 dev classpath 需要的那份
+    // 产物），因为本机访问不了 cfa2.cursemaven.com：Gradle 一联网 HEAD 元数据就 Connection reset，
+    // 而解析失败会连带把整个 __obfuscated 配置拖垮（geckolib 也会一起报 Could not find）。
+    // 缓存缺失时再回退到正常的 curse maven 坐标，联网环境会自动走回退分支。
+    def cachedJei = fileTree("${gradle.gradleUserHomeDir}/caches/forge_gradle/deobf_dependencies") {
+        include '**/jei-238222-*_mapped_*.jar'
+    }.files.find { it.isFile() }
+
+    if (cachedJei != null) {
+        compileOnly files(cachedJei)
+        runtimeOnly files(cachedJei)
+    } else {
+        compileOnly fg.deobf("curse.maven:jei-238222:6075247")
+        runtimeOnly fg.deobf("curse.maven:jei-238222:6075247")
+    }
+
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 

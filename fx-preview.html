@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GalBoss · pixelfx 特效预览</title>
+<style>
+:root{
+  --bg:#0d0b12; --panel:#171320; --panel2:#1f1a2b; --line:#2e2740;
+  --gold:#e0a12b; --gold2:#ffd25a; --text:#e8e2f0; --dim:#9a90ad;
+  --ok:#6fcf97; --warn:#f2c94c; --bad:#eb5757;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:14px/1.5 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+header{padding:20px 26px 14px;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,#1a1526,#0d0b12)}
+h1{margin:0 0 4px;font-size:19px;letter-spacing:.5px}
+h1 span{color:var(--gold2)}
+.sub{color:var(--dim);font-size:12.5px}
+.sub code{background:#241d33;padding:1px 5px;border-radius:4px;color:var(--gold2)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.filters button{background:var(--panel2);border:1px solid var(--line);color:var(--text);
+  padding:5px 12px;border-radius:14px;cursor:pointer;font-size:12.5px}
+.filters button.on{background:var(--gold);border-color:var(--gold);color:#221a08;font-weight:600}
+main{padding:20px 26px 60px;display:grid;gap:14px;
+  grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:10px;cursor:pointer;transition:.15s;overflow:hidden}
+.card:hover{border-color:var(--gold);transform:translateY(-2px)}
+.card canvas{width:100%;height:150px;display:block;border-radius:6px;
+  background:repeating-conic-gradient(#141019 0% 25%,#1b1526 0% 50%) 50%/18px 18px}
+.card .name{font-size:12.5px;margin-top:8px;color:var(--gold2);font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .meta{font-size:11px;color:var(--dim);margin-top:2px}
+.badges{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.b{font-size:10px;padding:1px 6px;border-radius:8px;border:1px solid var(--line);color:var(--dim)}
+.b.ground{color:#8fd6a8;border-color:#2f5c42}
+.b.billboard{color:#8fb8f6;border-color:#2c4570}
+.b.loop{color:#e8c46a;border-color:#5c4a1f}
+.b.hot{color:#ff9a8b;border-color:#6b2f2a}
+
+#ov{position:fixed;inset:0;background:#000a;backdrop-filter:blur(3px);
+  display:none;align-items:center;justify-content:center;padding:20px;z-index:9}
+#ov.on{display:flex}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  width:min(1000px,100%);max-height:92vh;overflow:auto;display:grid;
+  grid-template-columns:1fr 320px;gap:0}
+.panel .left{padding:18px;border-right:1px solid var(--line)}
+.panel .right{padding:18px;font-size:12.5px}
+.panel h2{margin:0 0 12px;font-size:16px;color:var(--gold2)}
+#big{width:100%;height:400px;display:block;border-radius:8px;
+  background:repeating-conic-gradient(#141019 0% 25%,#1b1526 0% 50%) 50%/22px 22px}
+#big.dark{background:#07060a}
+.ctrl{display:flex;align-items:center;gap:8px;margin:9px 0;font-size:12.5px}
+.ctrl label{width:96px;color:var(--dim);flex:none}
+.ctrl input[type=range]{flex:1;accent-color:var(--gold)}
+.ctrl .val{width:52px;text-align:right;color:var(--gold2);font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;margin-top:6px}
+td{padding:3px 0;vertical-align:top;font-size:12px}
+td:first-child{color:var(--dim);width:42%}
+.close{float:right;background:none;border:1px solid var(--line);color:var(--dim);
+  border-radius:6px;cursor:pointer;padding:2px 9px}
+.hint{color:var(--dim);font-size:11.5px;margin-top:10px;line-height:1.6}
+.warnrow{color:var(--bad)}
+</style>
+</head>
+<body>
+<header>
+  <h1>GalBoss · <span>pixelfx</span> 特效预览</h1>
+  <div class="sub">
+    17 个序列帧特效 · 素材直读 <code>assets/galboss/textures/fx</code> ·
+    光层用 <code>lighter</code> 叠加模拟游戏内的 <code>SRC_ALPHA/ONE</code>
+  </div>
+  <div class="filters" id="filters"></div>
+</header>
+<main id="grid"></main>
+
+<div id="ov">
+  <div class="panel">
+    <div class="left">
+      <h2 id="dTitle">—</h2>
+      <canvas id="big"></canvas>
+      <div class="ctrl"><label>播放速度</label>
+        <input type="range" id="cFps" min="4" max="40" step="1"><span class="val" id="vFps"></span></div>
+      <div class="ctrl"><label>显示尺寸</label>
+        <input type="range" id="cScale" min="0.3" max="1.4" step="0.05"><span class="val" id="vScale"></span></div>
+      <div class="ctrl"><label>光层</label>
+        <input type="range" id="cLight" min="0" max="4" step="0.1"><span class="val" id="vLight"></span></div>
+      <div class="ctrl"><label>背景</label>
+        <button class="close" id="cBg" style="float:none">棋盘 / 纯黑</button>
+        <span class="val"></span></div>
+    </div>
+    <div class="right">
+      <button class="close" id="dClose">关闭</button>
+      <h2 style="font-size:14px">元数据</h2>
+      <table id="dMeta"></table>
+      <h2 style="font-size:14px;margin-top:16px">实测像素统计</h2>
+      <table id="dStats"></table>
+      <div class="hint" id="dHint"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DATA = [{"slug":"epitaph_aegis","texture":"src/main/resources/assets/galboss/textures/fx/epitaph_aegis.png","light":"src/main/resources/assets/galboss/textures/fx/epitaph_aegis_light.png","frameW":138,"frameH":151,"cols":14,"rows":4,"frames":48,"fps":20,"loop":true,"durationTicks":48,"pivot":{"x":69.0,"y":143.0},"anchor":"billboard","defaultScale":0.04,"tint":"#ecc780","lightStrength":4.0,"premultiplied":false,"src":"holy/shield-aura","usedBy":"魔法 · 神盾 / 领域收尾","note":"已换源=八边形护盾(holy/shield-aura)","stats":{"pad":11.6,"contentW":127,"contentH":145,"white":10.7,"lightRgb":22.2,"pivotDx":0.0,"pivotDy":-7.0}},{"slug":"epitaph_gungnir","texture":"src/main/resources/assets/galboss/textures/fx/epitaph_gungnir.png","light":"src/main/resources/assets/galboss/textures/fx/epitaph_gungnir_light.png","frameW":237,"frameH":69,"cols":8,"rows":3,"frames":21,"fps":20,"loop":false,"durationTicks":21,"pivot":{"x":214.0,"y":26.0},"anchor":"billboard","defaultScale":0.035,"tint":"#ecc780","lightStrength":2.4,"premultiplied":false,"src":"holy/divine-lance","usedBy":"魔法 · 神枪显形","note":"已换源=光枪(holy/divine-lance)","stats":{"pad":2.5,"contentW":231,"contentH":69,"white":20.9,"lightRgb":37.6,"pivotDx":99.0,"pivotDy":-42.0}},{"slug":"epitaph_lightning_bolt","texture":"src/main/resources/assets/galboss/textures/fx/epitaph_lightning_bolt.png","light":"src/main/resources/assets/galboss/textures/fx/epitaph_lightning_bolt_light.png","frameW":231,"frameH":262,"cols":8,"rows":8,"frames":61,"fps":20,"loop":false,"durationTicks":61,"pivot":{"x":115.0,"y":227.0},"anchor":"billboard","defaultScale":0.025,"tint":"#ffd191","lightStrength":2.4,"premultiplied":true,"src":"lightning/lightning-strike","usedBy":"魔法 · 落雷柱","note":"","stats":{"pad":6.4,"contentW":223,"contentH":254,"white":2.7,"lightRgb":37.3,"pivotDx":0.0,"pivotDy":-26.0}},{"slug":"epitaph_mjolnir","texture":"src/main/resources/assets/galboss/textures/fx/epitaph_mjolnir.png","light":"src/main/resources/assets/galboss/textures/fx/epitaph_mjolnir_light.png","frameW":220,"frameH":254,"cols":9,"rows":3,"frames":27,"fps":20,"loop":false,"durationTicks":27,"pivot":{"x":110.0,"y":242.0},"anchor":"billboard","defaultScale":0.04,"tint":"#b192d0","lightStrength":1.9,"premultiplied":false,"src":"impacts/hammer-smash","usedBy":"魔法 · 雷锤砸落","note":"已换源=方头战锤(impacts/hammer-smash)","stats":{"pad":5.9,"contentW":207,"contentH":254,"white":6.5,"lightRgb":46.5,"pivotDx":1.0,"pivotDy":-11.0}},{"slug":"epitaph_spear_fall","texture":"src/main/resources/assets/galboss/textures/fx/epitaph_spear_fall.png","light":"src/main/resources/assets/galboss/textures/fx/epitaph_spear_fall_light.png","frameW":137,"frameH":118,"cols":14,"rows":4,"frames":53,"fps":20,"loop":false,"durationTicks":53,"pivot":{"x":76.0,"y":99.0},"anchor":"billboard","defaultScale":0.025,"tint":"#ffd191","lightStrength":2.8,"premultiplied":false,"src":"ice/icicle-fall","usedBy":"魔法 · 枪影坠落","note":"","stats":{"pad":22.0,"contentW":137,"contentH":92,"white":16.6,"lightRgb":31.6,"pivotDx":8.0,"pivotDy":-7.0}},{"slug":"epitaph_spear_impact","texture":"src/main/resources/assets/galboss/textures/fx/epitaph_spear_impact.png","light":"src/main/resources/assets/galboss/textures/fx/epitaph_spear_impact_light.png","frameW":204,"frameH":192,"cols":10,"rows":4,"frames":35,"fps":20,"loop":false,"durationTicks":35,"pivot":{"x":102.0,"y":95.0},"anchor":"ground","defaultScale":0.03,"tint":"#ffd191","lightStrength":1.6,"premultiplied":false,"src":"explosions/plasma-explosion","usedBy":"魔法 · 枪落点 / 贯穿沿线","note":"源=等离子爆炸","stats":{"pad":4.5,"contentW":198,"contentH":189,"white":12.2,"lightRgb":55.0,"pivotDx":1.5,"pivotDy":-96.0}},{"slug":"epitaph_storm_sky","texture":"src/main/resources/assets/galboss/textures/fx/epitaph_storm_sky.png","light":"src/main/resources/assets/galboss/textures/fx/epitaph_storm_sky_light.png","frameW":161,"frameH":174,"cols":12,"rows":4,"frames":40,"fps":20,"loop":true,"durationTicks":40,"pivot":{"x":81.0,"y":163.0},"anchor":"billboard","defaultScale":0.027,"tint":"#b192d0","lightStrength":2.6,"premultiplied":false,"src":"lightning/storm-cloud","usedBy":"魔法 · 雷云天幕","note":"已换源=雷云(lightning/storm-cloud)","stats":{"pad":6.9,"contentW":161,"contentH":162,"white":0.1,"lightRgb":34.7,"pivotDx":1.0,"pivotDy":-2.0}},{"slug":"ikuko_parry_flash","texture":"src/main/resources/assets/galboss/textures/fx/ikuko_parry_flash.png","light":"src/main/resources/assets/galboss/textures/fx/ikuko_parry_flash_light.png","frameW":158,"frameH":100,"cols":12,"rows":2,"frames":21,"fps":20,"loop":false,"durationTicks":21,"pivot":{"x":74.0,"y":85.0},"anchor":"billboard","defaultScale":0.03,"tint":"#82b6d9","lightStrength":2.2,"premultiplied":false,"src":"impacts/parry","usedBy":"郁子 · 格挡闪光","note":"","stats":{"pad":26.5,"contentW":157,"contentH":74,"white":11.9,"lightRgb":40.3,"pivotDx":-4.0,"pivotDy":-2.0}},{"slug":"ikuko_quake","texture":"src/main/resources/assets/galboss/textures/fx/ikuko_quake.png","light":"src/main/resources/assets/galboss/textures/fx/ikuko_quake_light.png","frameW":263,"frameH":82,"cols":7,"rows":9,"frames":63,"fps":20,"loop":false,"durationTicks":63,"pivot":{"x":132.0,"y":66.0},"anchor":"ground","defaultScale":0.027,"tint":"#82b6d9","lightStrength":4.4,"premultiplied":false,"src":"nature/quake","usedBy":"郁子 · 震地波","note":"","stats":{"pad":13.7,"contentW":262,"contentH":71,"white":0.0,"lightRgb":20.3,"pivotDx":0.5,"pivotDy":-6.0}},{"slug":"rei_bullet_impact","texture":"src/main/resources/assets/galboss/textures/fx/rei_bullet_impact.png","light":"src/main/resources/assets/galboss/textures/fx/rei_bullet_impact_light.png","frameW":120,"frameH":73,"cols":17,"rows":2,"frames":29,"fps":20,"loop":false,"durationTicks":29,"pivot":{"x":88.0,"y":61.0},"anchor":"billboard","defaultScale":0.03,"tint":"#ffd191","lightStrength":2.2,"premultiplied":false,"src":"impacts/bullet-impact","usedBy":"礼 · 弹着点 / 链雷节点","note":"","stats":{"pad":44.2,"contentW":94,"contentH":52,"white":3.1,"lightRgb":40.1,"pivotDx":39.5,"pivotDy":-1.0}},{"slug":"rei_crit_hit","texture":"src/main/resources/assets/galboss/textures/fx/rei_crit_hit.png","light":"src/main/resources/assets/galboss/textures/fx/rei_crit_hit_light.png","frameW":192,"frameH":131,"cols":10,"rows":2,"frames":19,"fps":20,"loop":false,"durationTicks":19,"pivot":{"x":77.0,"y":102.0},"anchor":"billboard","defaultScale":0.028,"tint":"#ffd191","lightStrength":2.0,"premultiplied":false,"src":"impacts/crit-hit","usedBy":"礼 · 暴击命中 / 金雨落点","note":"","stats":{"pad":41.5,"contentW":173,"contentH":85,"white":3.6,"lightRgb":44.5,"pivotDx":-26.0,"pivotDy":-1.0}},{"slug":"tohka_bell_wave","texture":"src/main/resources/assets/galboss/textures/fx/tohka_bell_wave.png","light":"src/main/resources/assets/galboss/textures/fx/tohka_bell_wave_light.png","frameW":248,"frameH":184,"cols":8,"rows":6,"frames":45,"fps":20,"loop":false,"durationTicks":45,"pivot":{"x":125.0,"y":141.0},"anchor":"ground","defaultScale":0.021,"tint":"#ecc780","lightStrength":1.9,"premultiplied":false,"src":"impacts/ground-slam","usedBy":"桐香 · 判决铃 / 落雷冲击环","note":"与 iron_fist 同源","stats":{"pad":15.6,"contentW":247,"contentH":156,"white":1.8,"lightRgb":47.3,"pivotDx":2.0,"pivotDy":-17.0}},{"slug":"tohka_confinement_sigil","texture":"src/main/resources/assets/galboss/textures/fx/tohka_confinement_sigil.png","light":"src/main/resources/assets/galboss/textures/fx/tohka_confinement_sigil_light.png","frameW":162,"frameH":126,"cols":12,"rows":8,"frames":85,"fps":20,"loop":false,"durationTicks":85,"pivot":{"x":81.0,"y":111.0},"anchor":"billboard","defaultScale":0.02,"tint":"#b192d0","lightStrength":2.5,"premultiplied":false,"src":"shadow/hex-sigil","usedBy":"桐香 · 禁足令 / 神盾","note":"","stats":{"pad":40.2,"contentW":108,"contentH":113,"white":12.8,"lightRgb":36.2,"pivotDx":-4.5,"pivotDy":-4.0}},{"slug":"tohka_convocation_circle","texture":"src/main/resources/assets/galboss/textures/fx/tohka_convocation_circle.png","light":"src/main/resources/assets/galboss/textures/fx/tohka_convocation_circle_light.png","frameW":118,"frameH":96,"cols":17,"rows":3,"frames":40,"fps":20,"loop":false,"durationTicks":40,"pivot":{"x":59.0,"y":76.0},"anchor":"ground","defaultScale":0.02,"tint":"#ecc780","lightStrength":2.6,"premultiplied":false,"src":"arcane/rune-circle","usedBy":"桐香 · 召集魔法阵","note":"","stats":{"pad":34.3,"contentW":102,"contentH":73,"white":7.5,"lightRgb":34.1,"pivotDx":0.5,"pivotDy":-16.0}},{"slug":"tohka_iron_fist","texture":"src/main/resources/assets/galboss/textures/fx/tohka_iron_fist.png","light":"src/main/resources/assets/galboss/textures/fx/tohka_iron_fist_light.png","frameW":198,"frameH":176,"cols":10,"rows":2,"frames":19,"fps":20,"loop":false,"durationTicks":19,"pivot":{"x":97.0,"y":164.0},"anchor":"ground","defaultScale":0.02,"tint":"#ffaf9d","lightStrength":2.1,"premultiplied":false,"src":"impacts/fist-slam","usedBy":"桐香 · 铁拳制裁","note":"已换源=护手重拳(impacts/fist-slam)","stats":{"pad":0.0,"contentW":198,"contentH":176,"white":17.0,"lightRgb":43.2,"pivotDx":-1.5,"pivotDy":-11.0}},{"slug":"tohka_phase2_eclipse","texture":"src/main/resources/assets/galboss/textures/fx/tohka_phase2_eclipse.png","light":"src/main/resources/assets/galboss/textures/fx/tohka_phase2_eclipse_light.png","frameW":147,"frameH":136,"cols":13,"rows":7,"frames":80,"fps":20,"loop":true,"durationTicks":80,"pivot":{"x":78.0,"y":68.0},"anchor":"billboard","defaultScale":0.02,"tint":"#b192d0","lightStrength":1.5,"premultiplied":false,"src":"shadow/eclipse","usedBy":"桐香 · 二阶段日食","note":"","stats":{"pad":20.6,"contentW":147,"contentH":108,"white":8.1,"lightRgb":60.2,"pivotDx":5.0,"pivotDy":-57.0}},{"slug":"tohka_verdict_smite","texture":"src/main/resources/assets/galboss/textures/fx/tohka_verdict_smite.png","light":"src/main/resources/assets/galboss/textures/fx/tohka_verdict_smite_light.png","frameW":180,"frameH":175,"cols":11,"rows":6,"frames":57,"fps":20,"loop":false,"durationTicks":57,"pivot":{"x":90.0,"y":147.0},"anchor":"billboard","defaultScale":0.02,"tint":"#ecc780","lightStrength":1.5,"premultiplied":false,"src":"holy/smite","usedBy":"桐香 · 全校裁决","note":"","stats":{"pad":0.0,"contentW":180,"contentH":175,"white":14.4,"lightRgb":58.9,"pivotDx":0.5,"pivotDy":-27.0}}];
+const bySlug = Object.create(null);
+DATA.forEach(e => bySlug[e.slug] = e);
+
+const sheets = Object.create(null);
+function sheet(e){
+  if (sheets[e.slug]) return sheets[e.slug];
+  const s = {ready:false, img:new Image(), light:null};
+  let need = 1;
+  s.img.onload = () => { if(--need === 0) s.ready = true; };
+  s.img.src = e.texture;
+  if (e.light){ need++; s.light = new Image(); s.light.onload = () => { if(--need===0) s.ready=true; }; s.light.src = e.light; }
+  sheets[e.slug] = s;
+  return s;
+}
+
+const tintCv = document.createElement('canvas');
+const tintCtx = tintCv.getContext('2d');
+
+function drawLayer(dst, img, e, frame, dx, dy, dw, dh, tint, alpha){
+  if (!img || !img.complete || !img.naturalWidth) return;
+  const sx = (frame % e.cols) * e.frameW;
+  const sy = Math.floor(frame / e.cols) * e.frameH;
+  dst.globalAlpha = (alpha === undefined ? 1 : alpha);
+  if (!tint || tint === '#ffffff'){
+    dst.drawImage(img, sx, sy, e.frameW, e.frameH, dx, dy, dw, dh);
+  } else {
+    const w = Math.max(1, Math.round(dw)), h = Math.max(1, Math.round(dh));
+    if (tintCv.width !== w || tintCv.height !== h){ tintCv.width = w; tintCv.height = h; }
+    tintCtx.globalCompositeOperation = 'source-over';
+    tintCtx.clearRect(0, 0, w, h);
+    tintCtx.drawImage(img, sx, sy, e.frameW, e.frameH, 0, 0, w, h);
+    tintCtx.globalCompositeOperation = 'multiply';
+    tintCtx.fillStyle = tint;
+    tintCtx.fillRect(0, 0, w, h);
+    tintCtx.globalCompositeOperation = 'destination-in';
+    tintCtx.drawImage(img, sx, sy, e.frameW, e.frameH, 0, 0, w, h);
+    tintCtx.globalCompositeOperation = 'source-over';
+    dst.drawImage(tintCv, dx, dy, dw, dh);
+  }
+  dst.globalAlpha = 1;
+}
+
+function drawEffect(dst, e, frame, W, H, opt){
+  dst.clearRect(0, 0, W, H);
+  const s = sheet(e);
+  if (!s.ready) return;
+  const fit = Math.min(W / e.frameW, H / e.frameH) * (opt.scale || 1);
+  const dw = e.frameW * fit, dh = e.frameH * fit;
+  const dx = (W - dw) / 2, dy = (H - dh) / 2;
+  const tint = opt.tint ? e.tint : null;
+  drawLayer(dst, s.img, e, frame, dx, dy, dw, dh, tint);
+  const strength = (opt.light === undefined ? e.lightStrength : opt.light);
+  if (strength > 0.001 && s.light && s.light.complete && s.light.naturalWidth){
+    dst.globalCompositeOperation = 'lighter';
+    const full = Math.floor(strength), frac = strength - full;
+    for (let i = 0; i < full; i++) drawLayer(dst, s.light, e, frame, dx, dy, dw, dh, tint, 1);
+    if (frac > 0.001) drawLayer(dst, s.light, e, frame, dx, dy, dw, dh, tint, frac);
+    dst.globalCompositeOperation = 'source-over';
+  }
+}
+
+/* ---------------- 网格卡片 ---------------- */
+const grid = document.getElementById('grid');
+const cards = [];
+DATA.forEach(e => {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.dataset.anchor = e.anchor;
+  card.dataset.loop = e.loop ? '1' : '0';
+  card.dataset.hot = e.stats.white >= 20 ? '1' : '0';
+  const cv = document.createElement('canvas');
+  cv.width = 460; cv.height = 300;
+  card.appendChild(cv);
+  const nm = document.createElement('div');
+  nm.className = 'name'; nm.textContent = e.slug;
+  const mt = document.createElement('div');
+  mt.className = 'meta';
+  mt.textContent = e.frameW + 'x' + e.frameH + ' · ' + e.frames + '帧 · ' + e.fps + 'fps · ' + e.usedBy;
+  const src = document.createElement('div');
+  src.className = 'meta'; src.style.opacity = '.7';
+  src.textContent = '源素材: ' + e.src;
+  const bg = document.createElement('div');
+  bg.className = 'badges';
+  bg.innerHTML = '<span class="b ' + e.anchor + '">' + e.anchor + '</span>'
+    + (e.loop ? '<span class="b loop">loop</span>' : '')
+    + (e.premultiplied ? '<span class="b hot">预乘</span>' : '')
+    + (e.stats.white >= 20 ? '<span class="b hot">白 ' + e.stats.white + '%</span>' : '')
+    + (e.note ? '<span class="b hot">' + e.note + '</span>' : '');
+  card.appendChild(nm); card.appendChild(mt); card.appendChild(src); card.appendChild(bg);
+  card.onclick = () => openDetail(e);
+  grid.appendChild(card);
+  cards.push({e, cv, ctx: cv.getContext('2d')});
+});
+
+/* ---------------- 过滤器 ---------------- */
+const FILTERS = [
+  ['全部', () => true],
+  ['地面 ground', e => e.anchor === 'ground'],
+  ['立牌 billboard', e => e.anchor === 'billboard'],
+  ['循环 loop', e => e.loop],
+  ['过曝 ≥20%', e => e.stats.white >= 20],
+  ['预乘 alpha', e => e.premultiplied],
+];
+const fbox = document.getElementById('filters');
+FILTERS.forEach(([label, fn], i) => {
+  const b = document.createElement('button');
+  b.textContent = label;
+  if (i === 0) b.className = 'on';
+  b.onclick = () => {
+    [...fbox.children].forEach(c => c.classList.remove('on'));
+    b.classList.add('on');
+    [...grid.children].forEach(card => {
+      const e = bySlug[card.querySelector('.name').textContent];
+      card.style.display = fn(e) ? '' : 'none';
+    });
+  };
+  fbox.appendChild(b);
+});
+
+/* ---------------- 主循环 ---------------- */
+const t0 = performance.now();
+function loop(now){
+  const t = (now - t0) / 1000;
+  for (let ci = 0; ci < cards.length; ci++){
+    const c = cards[ci];
+    const tt = t + ci * 0.37;
+    if (c.cv.parentElement.style.display === 'none') continue;
+    const e = c.e;
+    let f = Math.floor(tt * e.fps);
+    f = e.loop ? (f % e.frames) : Math.min(f, e.frames - 1);
+    drawEffect(c.ctx, e, f, c.cv.width, c.cv.height, {tint: true, light: e.lightStrength});
+  }
+  if (detail.e) renderDetail(now);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ---------------- 详情 ---------------- */
+const ov = document.getElementById('ov');
+const big = document.getElementById('big');
+const bigCtx = big.getContext('2d');
+const detail = {e:null, fps:20, scale:1, light:1, dark:false, start:0};
+
+function openDetail(e){
+  detail.e = e; detail.fps = e.fps; detail.scale = 1; detail.light = e.lightStrength;
+  detail.start = performance.now();
+  document.getElementById('dTitle').textContent = e.slug + '  ·  ' + e.usedBy;
+  const m = document.getElementById('dMeta');
+  m.innerHTML =
+    row('贴图尺寸', e.frameW + ' × ' + e.frameH) +
+    row('网格', e.cols + ' 列 × ' + e.rows + ' 行') +
+    row('帧数 / fps', e.frames + ' 帧 / ' + e.fps + ' fps') +
+    row('时长', (e.frames / e.fps).toFixed(2) + ' 秒') +
+    row('锚点', e.anchor) +
+    row('pivot', e.pivot.x + ', ' + e.pivot.y) +
+    row('defaultScale', e.defaultScale) +
+    row('tint', e.tint) +
+    row('lightStrength', e.lightStrength) +
+    row('预乘 alpha', e.premultiplied ? '是' : '否') +
+    row('源素材', e.src) +
+    (e.note ? row('备注', '<span style="color:#ff9a8b">' + e.note + '</span>') : '');
+  const s = e.stats;
+  const st = document.getElementById('dStats');
+  st.innerHTML =
+    row('内容尺寸', s.contentW + ' × ' + s.contentH) +
+    row('空白占比', s.pad + ' %') +
+    row('纯白占比', s.white + ' %') +
+    row('光层 RGB 均值', s.lightRgb) +
+    row('pivot 相对内容', 'dx ' + s.pivotDx + ' / dy ' + s.pivotDy);
+  const hint = document.getElementById('dHint');
+  let h = '';
+  if (s.white >= 20) h += '<div class="warnrow">白核占 ' + s.white + '%：Godot 的 HDR/bloom 被截断成纯白，靠 tint 染回主题色。</div>';
+  if (s.pad >= 30) h += '<div>空白留边 ' + s.pad + '%：defaultScale 按帧宽算，实际可见尺寸会比数字小一圈。</div>';
+  if (s.pivotDy < -20 && e.anchor === 'ground') h += '<div class="warnrow">pivot 比内容底边高 ' + Math.abs(s.pivotDy) + 'px：地面特效会陷进地面。</div>';
+  if (e.premultiplied) h += '<div>预乘 alpha：游戏内已改用 ONE/ONE_MINUS_SRC_ALPHA，浏览器预览仍按直通显示，柔边会偏暗。</div>';
+  hint.innerHTML = h;
+  document.getElementById('cFps').value = e.fps;
+  document.getElementById('cScale').value = 1;
+  document.getElementById('cLight').value = e.lightStrength;
+  syncLabels();
+  ov.classList.add('on');
+}
+
+function row(k, v){ return '<tr><td>' + k + '</td><td>' + v + '</td></tr>'; }
+function syncLabels(){
+  document.getElementById('vFps').textContent = detail.fps + ' fps';
+  document.getElementById('vScale').textContent = Math.round(detail.scale * 100) + '%';
+  document.getElementById('vLight').textContent = detail.light.toFixed(1) + '×';
+}
+function renderDetail(now){
+  const e = detail.e; if (!e) return;
+  const t = (now - detail.start) / 1000;
+  let f = Math.floor(t * detail.fps);
+  f = e.loop ? (f % e.frames) : Math.min(f, e.frames - 1);
+  drawEffect(bigCtx, e, f, big.width, big.height,
+    {tint: true, light: detail.light, scale: detail.scale});
+}
+
+document.getElementById('cFps').oninput = ev => { detail.fps = +ev.target.value; syncLabels(); };
+document.getElementById('cScale').oninput = ev => { detail.scale = +ev.target.value; syncLabels(); };
+document.getElementById('cLight').oninput = ev => { detail.light = +ev.target.value; syncLabels(); };
+document.getElementById('cBg').onclick = () => { detail.dark = !detail.dark; big.classList.toggle('dark', detail.dark); };
+document.getElementById('dClose').onclick = () => { ov.classList.remove('on'); detail.e = null; };
+ov.onclick = ev => { if (ev.target === ov){ ov.classList.remove('on'); detail.e = null; } };
+addEventListener('keydown', ev => { if (ev.key === 'Escape'){ ov.classList.remove('on'); detail.e = null; } });
+
+big.width = 760; big.height = 400;
+</script>
+</body>
+</html>

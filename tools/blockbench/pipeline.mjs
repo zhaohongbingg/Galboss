@@ -582,7 +582,14 @@ async function phaseShot(key) {
 
 async function phaseExport(key) {
   const c = CHARACTERS[key];
-  const res = await callTool('geckolib_export_model', { mode: 'compile', path: c.geo_out, max_content_length: 1200 });
+  // ⚠ overwrite 必须显式传 true —— 导出工具默认 false，目标文件已存在时**一个字节都不会写**，
+  //   只回一句 "already exists"。不传的话 `make` 看着跑完了，geo 其实还是旧的（"改了模型没生效"）。
+  const res = await callTool('geckolib_export_model', {
+    mode: 'compile',
+    path: c.geo_out,
+    max_content_length: 1200,
+    overwrite: true
+  });
   console.log(textOf(res));
 }
 

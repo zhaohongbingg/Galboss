@@ -1,0 +1,39 @@
+{
+ "slug": "epitaph_spear_fall",
+ "pixelfxId": "ice/icicle-fall",
+ "texture": "galboss:textures/fx/epitaph_spear_fall",
+ "lightTexture": "galboss:textures/fx/epitaph_spear_fall_light",
+ "frameW": 137,
+ "frameH": 118,
+ "cols": 14,
+ "rows": 4,
+ "frames": 53,
+ "fps": 20,
+ "loop": false,
+ "durationTicks": 53,
+ "pivot": {
+  "x": 76,
+  "y": 99
+ },
+ "anchor": "billboard",
+ "defaultScale": 0.025,
+ "palette": [
+  "#1c1206",
+  "#3a2408",
+  "#6b410c",
+  "#9c5f12",
+  "#cc8420",
+  "#ffb347",
+  "#ffd98a",
+  "#fff4d6"
+ ],
+ "source": {
+  "repo": "https://github.com/patch-gg/pixelfx",
+  "license": "MIT",
+  "effect": "ice/icicle-fall",
+  "seed": 22,
+  "adaptedFrom": "Hugo Duprez / Sprite Fusion (MIT), Hollow Crown (MIT)，见 NOTICE.md"
+ },
+ "lightStrength": 2.8,
+ "tint": "#ffd191"
+}

@@ -6,6 +6,8 @@ import com.example.galboss.boss.DemeritLedger;
 import com.example.galboss.boss.DisciplineRules;
 import com.example.galboss.boss.SkillScheduler;
 import com.example.galboss.effect.ModEffects;
+import com.example.galboss.fx.PixelfxSlugs;
+import com.example.galboss.fx.PixelfxFx;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -449,6 +451,9 @@ public class ReizenTohkaEntity extends AbstractFSBossEntity {
         skills.interrupt(this);
         skills.block(PHASE_TRANSITION + 20);
         playAnim("phase");
+        // pixelfx：二阶段过场是一段循环的日食立牌，寿命与过场同样长（50 tick）
+        PixelfxFx.playLooping(level(), new Vec3(getX(), getY(), getZ()),
+                PixelfxSlugs.TOHKA_PHASE2_ECLIPSE, PHASE_TRANSITION);
         broadcastNearby(getDialogueKey() + "phase2", "§5");
         this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
                 SoundEvents.WARDEN_ROAR, SoundSource.HOSTILE, 1.6f, 1.2f);
@@ -640,6 +645,8 @@ public class ReizenTohkaEntity extends AbstractFSBossEntity {
                 DisciplineRules.begin(sp, randomRule(), cdTicks(8 * 20), this::onPlayerViolation);
             }
             BossTelegraph.impact(this.level(), player.position().add(0.0, 1.0, 0.0), BossTelegraph.SCARLET, 12);
+            // pixelfx：全校裁决按人判罚 → 每人头上落一道圣光裁决（billboard 锚点）
+            PixelfxFx.play(this.level(), player.position(), PixelfxSlugs.TOHKA_VERDICT_SMITE);
             player.displayClientMessage(Component.translatable(getDialogueKey() + "verdict_hit", count), true);
         }
 
@@ -831,6 +838,9 @@ public class ReizenTohkaEntity extends AbstractFSBossEntity {
             BossTelegraph.impact(level(), box.getCenter(), BossTelegraph.SCARLET, 24);
             level().playSound(null, box.getCenter().x, box.getCenter().y, box.getCenter().z,
                     SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 1.3f, 0.9f);
+            // pixelfx：铁拳制裁命中 → 命中区地面上的猩红重击（ground 锚点，贴地）
+            PixelfxFx.play(level(), new Vec3(box.getCenter().x, getY(), box.getCenter().z),
+                    PixelfxSlugs.TOHKA_IRON_FIST);
         }
     }
 
@@ -874,6 +884,10 @@ public class ReizenTohkaEntity extends AbstractFSBossEntity {
 
             double previous = wave;
             wave += 0.55;
+            if (previous <= 0.0) {
+                // pixelfx：判决铃的冲击波就是从这里开始向外扫的 → 脚下金色雷击波（ground 锚点）
+                PixelfxFx.play(level(), new Vec3(getX(), getY(), getZ()), PixelfxSlugs.TOHKA_BELL_WAVE);
+            }
             BossTelegraph.circle(level(), position(), wave, BossTelegraph.GOLD);
             damageRing(previous, wave, BELL_DAMAGE);
             if (wave > BELL_RADIUS) {
@@ -902,6 +916,8 @@ public class ReizenTohkaEntity extends AbstractFSBossEntity {
             playAnim("combo");
             broadcastNearby(getDialogueKey() + "summon", "§e");
             BossTelegraph.convocation(level(), position(), SUMMON_RADIUS);
+            // pixelfx：学生会召集的魔法阵落在她脚边（ground 锚点）
+            PixelfxFx.play(level(), new Vec3(getX(), getY(), getZ()), PixelfxSlugs.TOHKA_CONVOCATION_CIRCLE);
             level().playSound(null, getX(), getY(), getZ(),
                     SoundEvents.WARDEN_ROAR, SoundSource.HOSTILE, 1.2f, 1.4f);
         }
@@ -940,6 +956,8 @@ public class ReizenTohkaEntity extends AbstractFSBossEntity {
             if (target != null) {
                 target.displayClientMessage(Component.translatable(getDialogueKey() + "confinement_marked"), true);
             }
+            // pixelfx：禁足令的印记落在被锁定的位置上（billboard 锚点，从地面立起来）
+            PixelfxFx.play(level(), this.marker, PixelfxSlugs.TOHKA_CONFINEMENT_SIGIL);
             level().playSound(null, getX(), getY(), getZ(),
                     SoundEvents.BELL_RESONATE, SoundSource.HOSTILE, 1.2f, 0.6f);
         }

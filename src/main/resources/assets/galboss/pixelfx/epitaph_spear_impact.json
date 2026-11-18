@@ -1,0 +1,39 @@
+{
+ "slug": "epitaph_spear_impact",
+ "pixelfxId": "explosions/plasma-explosion",
+ "texture": "galboss:textures/fx/epitaph_spear_impact",
+ "lightTexture": "galboss:textures/fx/epitaph_spear_impact_light",
+ "frameW": 204,
+ "frameH": 192,
+ "cols": 10,
+ "rows": 4,
+ "frames": 35,
+ "fps": 20,
+ "loop": false,
+ "durationTicks": 35,
+ "pivot": {
+  "x": 102,
+  "y": 95
+ },
+ "anchor": "ground",
+ "defaultScale": 0.03,
+ "palette": [
+  "#1c1206",
+  "#3a2408",
+  "#6b410c",
+  "#9c5f12",
+  "#cc8420",
+  "#ffb347",
+  "#ffd98a",
+  "#fff4d6"
+ ],
+ "source": {
+  "repo": "https://github.com/patch-gg/pixelfx",
+  "license": "MIT",
+  "effect": "explosions/plasma-explosion",
+  "seed": 23,
+  "adaptedFrom": "Hugo Duprez / Sprite Fusion (MIT), Hollow Crown (MIT)，见 NOTICE.md"
+ },
+ "lightStrength": 1.6,
+ "tint": "#ffd191"
+}

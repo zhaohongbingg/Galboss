@@ -1,0 +1,39 @@
+{
+ "slug": "ikuko_parry_flash",
+ "pixelfxId": "impacts/parry",
+ "texture": "galboss:textures/fx/ikuko_parry_flash",
+ "lightTexture": "galboss:textures/fx/ikuko_parry_flash_light",
+ "frameW": 158,
+ "frameH": 100,
+ "cols": 12,
+ "rows": 2,
+ "frames": 21,
+ "fps": 20,
+ "loop": false,
+ "durationTicks": 21,
+ "pivot": {
+  "x": 74,
+  "y": 85
+ },
+ "anchor": "billboard",
+ "defaultScale": 0.03,
+ "palette": [
+  "#081420",
+  "#0f2942",
+  "#1a4468",
+  "#24628f",
+  "#2f86bf",
+  "#5cb3e0",
+  "#a3dbf2",
+  "#eafaff"
+ ],
+ "source": {
+  "repo": "https://github.com/patch-gg/pixelfx",
+  "license": "MIT",
+  "effect": "impacts/parry",
+  "seed": 19,
+  "adaptedFrom": "Hugo Duprez / Sprite Fusion (MIT), Hollow Crown (MIT)，见 NOTICE.md"
+ },
+ "lightStrength": 2.2,
+ "tint": "#82b6d9"
+}

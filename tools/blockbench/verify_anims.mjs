@@ -12,6 +12,11 @@ const textOf = (res) => {
 const CAM_QUARTER = { position: [48, 22, -62], target: [0, 17, 0], projection: 'perspective', fov: 32 };
 const CAM_SIDE = { position: [78, 20, -6], target: [0, 17, 0], projection: 'perspective', fov: 32 };
 
+// 坐下时整个人贴到地面，默认相机（瞄 y=17）会拍空一半，所以单独给一组低机位。
+// 侧视图最关键：腿是不是真的前伸、脚有没有落回地面，只有侧面看得出来。
+const CAM_SIT_QUARTER = { position: [46, 14, -58], target: [0, 8, 0], projection: 'perspective', fov: 32 };
+const CAM_SIT_SIDE = { position: [74, 11, -4], target: [0, 8, 0], projection: 'perspective', fov: 32 };
+
 // [动画名, 采样时间, 相机, 文件名后缀]
 const SHOTS = [
   ['attack', 0.42, CAM_QUARTER, ''],
@@ -35,7 +40,10 @@ const SHOTS = [
   ['shoot', 0.25, CAM_QUARTER, '_hold'],
   ['shoot', 0.25, CAM_SIDE, '_hold_side'],
   ['combo', 0.29, CAM_QUARTER, '_hit'],
-  ['cast', 0.45, CAM_QUARTER, '_hold']
+  ['cast', 0.45, CAM_QUARTER, '_hold'],
+  // 宠物系统的「坐下」：侧视看腿有没有真正前伸、脚有没有落回地面
+  ['sit', 0.5, CAM_SIT_SIDE, ''],
+  ['sit', 0.5, CAM_SIT_QUARTER, '_quarter']
 ];
 
 await initialize();

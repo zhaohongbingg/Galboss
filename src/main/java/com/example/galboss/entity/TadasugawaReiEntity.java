@@ -1,6 +1,8 @@
 package com.example.galboss.entity;
 
 import com.example.galboss.boss.DemeritLedger;
+import com.example.galboss.fx.PixelfxSlugs;
+import com.example.galboss.fx.PixelfxFx;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
@@ -523,6 +525,10 @@ public class TadasugawaReiEntity extends AbstractFSBossEntity {
             target.hurt(damageSources().mobAttack(TadasugawaReiEntity.this), COMBO_DAMAGE[this.stage]);
             level().playSound(null, getX(), getY(), getZ(),
                     SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.HOSTILE, 1.0f, 1.2f);
+            if (this.stage == COMBO_DAMAGE.length - 1) {
+                // pixelfx：连罚第四段（16 伤害）是整套连段的终结 → 暴击命中
+                PixelfxFx.play(level(), target.position().add(0.0, 1.2, 0.0), PixelfxSlugs.REI_CRIT_HIT);
+            }
             this.stage++;
             this.waitTicks = COMBO_INTERVAL_MIN
                     + TadasugawaReiEntity.this.random.nextInt(COMBO_INTERVAL_MAX - COMBO_INTERVAL_MIN + 1);
@@ -681,6 +687,12 @@ public class TadasugawaReiEntity extends AbstractFSBossEntity {
         }
         this.level().playSound(null, victim.getX(), victim.getY(), victim.getZ(),
                 SoundEvents.ARROW_HIT_PLAYER, SoundSource.HOSTILE, 1.2f, 1.4f);
+        // pixelfx：枪击命中 → 弹着点（billboard 锚点，挂在胸口高度）
+        PixelfxFx.play(this.level(), victim.position().add(0.0, 1.0, 0.0), PixelfxSlugs.REI_BULLET_IMPACT);
+        if (bullet.armorPiercing) {
+            // 狙击弹是她的高伤 / 终结手段，额外叠一层暴击表现
+            PixelfxFx.play(this.level(), victim.position().add(0.0, 1.2, 0.0), PixelfxSlugs.REI_CRIT_HIT);
+        }
         if (this.level() instanceof ServerLevel serverLevel) {
             serverLevel.sendParticles(ParticleTypes.CRIT,
                     victim.getX(), victim.getY() + 1.0, victim.getZ(), 6, 0.25, 0.25, 0.25, 0.12);

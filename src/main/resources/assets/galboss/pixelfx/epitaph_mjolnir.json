@@ -1,0 +1,39 @@
+{
+ "slug": "epitaph_mjolnir",
+ "pixelfxId": "impacts/hammer-smash",
+ "texture": "galboss:textures/fx/epitaph_mjolnir",
+ "lightTexture": "galboss:textures/fx/epitaph_mjolnir_light",
+ "frameW": 220,
+ "frameH": 254,
+ "cols": 9,
+ "rows": 3,
+ "frames": 27,
+ "fps": 20,
+ "loop": false,
+ "durationTicks": 27,
+ "pivot": {
+  "x": 110,
+  "y": 242
+ },
+ "anchor": "billboard",
+ "defaultScale": 0.04,
+ "palette": [
+  "#120a1e",
+  "#241238",
+  "#3f1f5e",
+  "#5c2f86",
+  "#7d49b0",
+  "#a471d8",
+  "#d3aef5",
+  "#f4e6ff"
+ ],
+ "source": {
+  "repo": "https://github.com/patch-gg/pixelfx",
+  "license": "MIT",
+  "effect": "impacts/hammer-smash",
+  "seed": 26,
+  "adaptedFrom": "Hugo Duprez / Sprite Fusion (MIT), Hollow Crown (MIT)，见 NOTICE.md"
+ },
+ "tint": "#b192d0",
+ "lightStrength": 1.9
+}

@@ -32,10 +32,14 @@ if (!CHARACTER_IDS.includes(proj)) {
 console.log(`当前项目: ${proj}`);
 
 // 1. 导出
+// ⚠ overwrite 必须显式传 true：导出工具的默认值是 false，文件已存在时会**什么都不写**
+//   并返回一句 "already exists"。曾经因此出现「项目里明明有 13 段动画，导出文件里还是旧的 12 段」
+//   这种极具误导性的现象 —— 看着像新动画没建出来，其实是根本没落盘。
 const res = await callTool('geckolib_export_animations', {
   mode: 'compile',
   path: `${MOD_ANIM}/${proj}.animation.json`,
-  max_content_length: 0
+  max_content_length: 0,
+  overwrite: true
 });
 console.log(textOf(res));
 

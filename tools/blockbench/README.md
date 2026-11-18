@@ -16,8 +16,12 @@
 | `_read_state.js` | 从 Blockbench 读回贴图与武器几何（见下方"手调后回写"） |
 | `make_gun_geo.mjs` | 手建礼的手枪：生成 `geo/rei_gun.geo.json` + 自产 128×128 色板贴图（不用 TACZ 资产） |
 | `make_katana_geo.mjs` | 手建郁子的武士刀：生成 `geo/ikuko_katana.geo.json`（贴图取 `ref/blade.png`） |
-| `geo_to_item_model.mjs` | **武器核心**：geo → 原版物品模型（uv 归一化 / X 镜像 / 握把居中 / element 旋转 / display 预设） |
+| `geo_to_item_model.mjs` | **武器核心**：geo → 原版物品模型（uv 归一化 / X 镜像 / 握把居中 / element 旋转 / display 预设）。`TEX_SIZE` 支持 `512` 或 `128x64`（非正方形图集） |
 | `verify_item_model.mjs` | 物品模型离线体检：uv 空间 / 逐面采样贴图 / element 旋转合法性（angle 必须 0·±22.5·±45） |
+| `import_bbmodel.mjs` | **外部交付模型**：`.bbmodel` → `geo/*.geo.json` + `textures/entity/*.png`（复刻 Blockbench 的 Bedrock 导出规则，见下方「外部交付的模型」） |
+| `make_goat_v6_anims.mjs` | **黑山羊 v6 动画生成**：读交付 `.bbmodel` 的 idle/walk 并转换，加手写 attack/cast/hurt/death，合成 `animations/black_goat_servant.animation.json`。`GOAT_PREVIEW=1` + `GOAT_OUT=` 可导出「未取反」版本喂 pose_tool（见 `BLACK-GOAT-SERVANT-V6.md` §3） |
+| `make_goat_v6_glowmask.py` | 黑山羊 v6 发光遮罩：从交付 1024² 贴图按色相抠出红瞳 → `*_glowmask.png` |
+| `pose_tool.mjs` | **动画迭代工具**：不启动 Blockbench，直接对 geo + animation 求值 → 渲染任意时刻姿态 PNG，并做立方体级「穿模体检」。⚠ 它不做 GeckoLib 载入时的第二次取反，带 x/y 旋转的动画要用 `GOAT_PREVIEW` 版本才看得对 |
 | `clean_weapon_models.mjs` | 武器 geo 清零展示旋转 + 删除空骨骼 |
 | `fix_weapon_bone_names.mjs` | 武器骨骼去重名（对照角色全部骨骼名） |
 
@@ -245,6 +249,91 @@ node verify_item_model.mjs        # 离线体检：uv 空间 + 逐面采样贴�
   而 `BlockAndItemGeoLayer` 又会调一次 `translateAndRotateMatrixForBone`（= 枢轴平移 + 旋转），
   净效果是 anchor 自己的旋转被应用**两次**：blockbench 里转 θ，游戏里转 2θ。
   枢轴位置不受影响（两次枢轴平移互相抵消），所以朝向一律去改物品模型的 display。
+
+## 外部交付的模型（贝阿朵莉切 / 黑山羊 v6）
+
+三个 FS 角色的 geo 是 `pipeline.mjs` 在 Blockbench 里现场建的；**贝阿朵莉切与黑山羊 v6 是外部交付的 `.bbmodel`**，
+没有走那条流水线。黑山羊 v6 的接入、动画与坐标系结论另见 `BLACK-GOAT-SERVANT-V6.md`
+（关键是 §3：导出取反 + GeckoLib 载入再取反 = 游戏里等于编辑空间角度；pose_tool 不做第二次取反）。
+
+`import_bbmodel.mjs` 把 Blockbench「Bedrock/GeckoLib 导出」的规则原样复刻了一遍 ——
+规则不是猜的，是对着 Blockbench v5 源码 `js/io/formats/bedrock.js` 的
+`parseCube` / `compileCube` / `compileGroup` 逐行核对过的：
+
+| # | 规则 | 依据 |
+|---|---|---|
+| 1 | 骨骼 pivot、立方体 origin 的 **X 取反**；origin 取最小角且 `origin.x = -(from.x + sizeX)` | `compileCube:928`、`compileGroup:999-1000` |
+| 2 | 骨骼 / 立方体 rotation 的 **X 与 Y 取反，Z 保留**；立方体 rotation 要带 `pivot` | `compileCube:934-937`、`compileBone:1001-1005` |
+| 3 | **up / down 两面要翻成右下角 + 负 `uv_size`**，其余四面原样搬（不然顶/底面贴图颠倒） | `compileCube:966-971` |
+| 4 | `texture_width/height` 填 **UV 空间**（bbmodel 的 `resolution`），不是贴图文件边长 | 贴图 4096² 而 UV 空间 512²，就是 8 倍降采样（脚本内置 PNG 盒式降采样，不依赖 Python） |
+| 5 | 欧拉顺序 **xyz**（`Rx·Ry·Rz`）—— Blockbench 的 THREE `Euler('XYZ')` 与 GeckoLib 的
+`Quaternionf.rotationXYZ` 是同一个顺序，所以角度可以直接搬，不做换序 | Blockbench 源码 + GeckoLib `RenderUtils` |
+
+```powershell
+# 角色：4096² 贴图缩到 512²（对应 UV 空间），输出 geo/beatrice.geo.json + textures/entity/beatrice.png
+node import_bbmodel.mjs "交付模型/人物模型/35_贝阿朵莉切_正面纹样与胸结修正 - Converted.bbmodel" `
+  beatrice.geo.json --texture beatrice.png --identifier geometry.beatrice --texture-scale 8
+
+# 烟斗：bedrock 工程，贴着图原样（128×64）
+node import_bbmodel.mjs "交付模型/贝阿朵莉切_烟斗.bbmodel" `
+  beatrice_pipe.geo.json --texture beatrice_pipe.png --identifier geometry.beatrice_pipe
+
+# 烟斗改成原版物品模型（非正方形图集要显式给 TEX_SIZE=128x64；握把取靠近嘴那段的杆）
+$env:TEX_SIZE='128x64'
+node geo_to_item_model.mjs beatrice_pipe.geo.json beatrice_pipe.json beatrice_pipe 0.6 "-9,8,0"
+node verify_item_model.mjs
+```
+
+产物与约定：
+
+- `geo/beatrice.geo.json` 313 骨骼 / 2159 立方体（4.1 MB），贴图 `textures/entity/beatrice.png` 512²
+- `animations/beatrice.animation.json` 只有 5 段（idle/walk/attack/hurt/death），**动过的骨骼要连静止姿态的角度一起写**
+  （如 `UpBody` 的 `-5`、`Head` 的 `7.5`、两只手臂的 `±15.5`、小腿的 `2.25`）—— GeckoLib 的 rotation 通道是绝对值，不是偏移
+- 模型原生高度 45.9 单位（≈2.87 格），按 YSM 的 `height_scale = 0.7` 惯例在**渲染器**里 `withScale(0.7f)`
+  收到 ≈2.0 格，与 `.sized(0.7f, 2.0f)` 对齐；geo 保持与交付模型 1:1，要改比例只动渲染器那一个数
+- 烟斗走「物品 + `BlockAndItemGeoLayer`」：挂点骨骼 `RightHandLocator`（rotation 必须为 0），
+  物品模型 `models/item/beatrice_pipe.json` 由 `geo_to_item_model.mjs` 生成，**别手改**
+- ⚠ 烟斗的 83 个立方体里有 **36 个是自由角度旋转**（90° / 135° / 180° / 67.5° / 177.5° …）。
+  原版物品模型只接受 `0 / ±22.5 / ±45`，**其它角度会让整个模型反序列化抛异常** ——
+  表现是模型根本不加载、手上只剩 missing 的紫黑棋盘格方块。`geo_to_item_model.mjs` 现在会
+  把这些角度**丢掉旋转**（保留轴对齐盒子，靠重叠维持体积）并打印统计；想保留圆环造型就得
+  手做低模物品模型，或改用 GeckoLib 的 GeoItem（不受角度限制）
+- 已知：源模型头部右侧有一块离头约 3 单位的独立小块（两种欧拉顺序下都存在），是交付模型自带的，
+  不是转换引入的；要处理就在 Blockbench 里调整后再重新导入
+
+### 动画迭代：pose_tool.mjs（不用 Blockbench）
+
+Blockbench 靠 MCP 一次改一根骨骼太慢，而「抬手会不会穿模」「走路腿穿过裙子」本质是几何问题。
+`pose_tool.mjs` 直接读 geo + animation，在任意时刻把骨骼姿态求值出来，**出图 + 穿模体检**：
+
+```powershell
+# 渲染某个动画在 t=1.5s 的姿态（front/side/three 任选）
+node pose_tool.mjs ../../src/main/resources/assets/galboss/geo/beatrice.geo.json `
+  --anim ../../src/main/resources/assets/galboss/animations/beatrice.animation.json `
+  --name animation.beatrice.idle --t 1.5 `
+  --texture ../../src/main/resources/assets/galboss/textures/entity/beatrice.png `
+  --render _preview/idle.png --views front,three
+
+# 试姿势：把候选角度写在 json 里（免得命令行引号地狱）
+node pose_tool.mjs <geo> --pose-file _preview/pose-v3.json --show RightHandLocator,LeftHandLocator
+
+# 穿模体检：A 组骨骼 × B 组骨骼，统计「真穿透」的立方体对数（3×3×3 体积采样，不是 AABB 高估）
+node pose_tool.mjs <geo> --anim <anim> --name animation.beatrice.walk --t 0.3 `
+  --clip "RightLeg,LeftLeg,RightFoot:Beatrice_EmbroideredOverskirt,Beatrice_WinePetticoat"
+```
+
+求值语义与 GeckoLib 4.4.2 对齐：rotation 通道是**绝对**值、position 是偏移；关键帧线性插值；
+Molang 只支持 `Math.sin/cos/abs/max/min`（角度制）+ `query.anim_time`。
+
+**这次用它查出来的两件事**（数值都是立方体级真穿透对数）：
+
+| | 修前 | 修后 | 静止基线 |
+|---|---|---|---|
+| 走路：腿/脚 × 裙摆 | 32 对 | 2~4 对 | 6 对 |
+| 抬手：右臂 × 躯干/头 | — | 202 对 | 256 对（袖子本来就塞在胸衣里，属美术内置重叠） |
+
+所以：**抬手是安全的**（举臂反而让重叠减少）；走路穿模的根因是腿摆 ±26° 太大，大腿从裙摆前后侧穿出去，
+改成 ±7° + 膝盖 6° + 裙摆反向摆 ±2.5° 后低于静止基线。
 
 ## 验证清单
 

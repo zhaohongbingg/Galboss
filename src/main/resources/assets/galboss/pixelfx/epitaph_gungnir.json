@@ -1,0 +1,39 @@
+{
+ "slug": "epitaph_gungnir",
+ "pixelfxId": "holy/divine-lance",
+ "texture": "galboss:textures/fx/epitaph_gungnir",
+ "lightTexture": "galboss:textures/fx/epitaph_gungnir_light",
+ "frameW": 237,
+ "frameH": 69,
+ "cols": 8,
+ "rows": 3,
+ "frames": 21,
+ "fps": 20,
+ "loop": false,
+ "durationTicks": 21,
+ "pivot": {
+  "x": 214,
+  "y": 26
+ },
+ "anchor": "billboard",
+ "defaultScale": 0.035,
+ "palette": [
+  "#241703",
+  "#4a2c08",
+  "#7d4a0e",
+  "#b87417",
+  "#e0a12b",
+  "#ffd25a",
+  "#fff0a8",
+  "#ffffff"
+ ],
+ "source": {
+  "repo": "https://github.com/patch-gg/pixelfx",
+  "license": "MIT",
+  "effect": "holy/divine-lance",
+  "seed": 25,
+  "adaptedFrom": "Hugo Duprez / Sprite Fusion (MIT), Hollow Crown (MIT)，见 NOTICE.md"
+ },
+ "tint": "#ecc780",
+ "lightStrength": 2.4
+}

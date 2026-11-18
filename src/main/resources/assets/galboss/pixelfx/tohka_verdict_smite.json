@@ -1,0 +1,39 @@
+{
+ "slug": "tohka_verdict_smite",
+ "pixelfxId": "holy/smite",
+ "texture": "galboss:textures/fx/tohka_verdict_smite",
+ "lightTexture": "galboss:textures/fx/tohka_verdict_smite_light",
+ "frameW": 180,
+ "frameH": 175,
+ "cols": 11,
+ "rows": 6,
+ "frames": 57,
+ "fps": 20,
+ "loop": false,
+ "durationTicks": 57,
+ "pivot": {
+  "x": 90,
+  "y": 147
+ },
+ "anchor": "billboard",
+ "defaultScale": 0.02,
+ "palette": [
+  "#241703",
+  "#4a2c08",
+  "#7d4a0e",
+  "#b87417",
+  "#e0a12b",
+  "#ffd25a",
+  "#fff0a8",
+  "#ffffff"
+ ],
+ "source": {
+  "repo": "https://github.com/patch-gg/pixelfx",
+  "license": "MIT",
+  "effect": "holy/smite",
+  "seed": 15,
+  "adaptedFrom": "Hugo Duprez / Sprite Fusion (MIT), Hollow Crown (MIT)，见 NOTICE.md"
+ },
+ "lightStrength": 1.5,
+ "tint": "#ecc780"
+}

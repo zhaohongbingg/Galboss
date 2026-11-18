@@ -1,0 +1,39 @@
+{
+ "slug": "tohka_convocation_circle",
+ "pixelfxId": "arcane/rune-circle",
+ "texture": "galboss:textures/fx/tohka_convocation_circle",
+ "lightTexture": "galboss:textures/fx/tohka_convocation_circle_light",
+ "frameW": 118,
+ "frameH": 96,
+ "cols": 17,
+ "rows": 3,
+ "frames": 40,
+ "fps": 20,
+ "loop": false,
+ "durationTicks": 40,
+ "pivot": {
+  "x": 59,
+  "y": 76
+ },
+ "anchor": "ground",
+ "defaultScale": 0.02,
+ "palette": [
+  "#241703",
+  "#4a2c08",
+  "#7d4a0e",
+  "#b87417",
+  "#e0a12b",
+  "#ffd25a",
+  "#fff0a8",
+  "#ffffff"
+ ],
+ "source": {
+  "repo": "https://github.com/patch-gg/pixelfx",
+  "license": "MIT",
+  "effect": "arcane/rune-circle",
+  "seed": 14,
+  "adaptedFrom": "Hugo Duprez / Sprite Fusion (MIT), Hollow Crown (MIT)，见 NOTICE.md"
+ },
+ "lightStrength": 2.6,
+ "tint": "#ecc780"
+}

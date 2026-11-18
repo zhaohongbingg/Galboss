@@ -19,7 +19,10 @@ import { CHARACTER_IDS, animsFor, overriddenNames } from './anims.mjs';
  */
 
 const HERE = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
-const MOD_ANIM = path.join(HERE, '..', 'src', 'main', 'resources', 'assets', 'galboss', 'animations');
+// ⚠ 两层 '..'：HERE 是 tools/blockbench，要回到仓库根得先出 blockbench 再出 tools。
+// 这里原来只写了一层，于是末尾的"统一校验"永远读不到动画文件、每次都报"没有动画文件"，
+// 看着像导出失败，其实是路径错了。
+const MOD_ANIM = path.join(HERE, '..', '..', 'src', 'main', 'resources', 'assets', 'galboss', 'animations');
 
 const textOf = (res) => {
   const c = res?.result?.content;

@@ -1,0 +1,39 @@
+{
+ "slug": "tohka_confinement_sigil",
+ "pixelfxId": "shadow/hex-sigil",
+ "texture": "galboss:textures/fx/tohka_confinement_sigil",
+ "lightTexture": "galboss:textures/fx/tohka_confinement_sigil_light",
+ "frameW": 162,
+ "frameH": 126,
+ "cols": 12,
+ "rows": 8,
+ "frames": 85,
+ "fps": 20,
+ "loop": false,
+ "durationTicks": 85,
+ "pivot": {
+  "x": 81,
+  "y": 111
+ },
+ "anchor": "billboard",
+ "defaultScale": 0.02,
+ "palette": [
+  "#120a1e",
+  "#241238",
+  "#3f1f5e",
+  "#5c2f86",
+  "#7d49b0",
+  "#a471d8",
+  "#d3aef5",
+  "#f4e6ff"
+ ],
+ "source": {
+  "repo": "https://github.com/patch-gg/pixelfx",
+  "license": "MIT",
+  "effect": "shadow/hex-sigil",
+  "seed": 13,
+  "adaptedFrom": "Hugo Duprez / Sprite Fusion (MIT), Hollow Crown (MIT)，见 NOTICE.md"
+ },
+ "lightStrength": 2.5,
+ "tint": "#b192d0"
+}

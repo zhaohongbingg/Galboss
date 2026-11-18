@@ -1,0 +1,39 @@
+{
+ "slug": "tohka_iron_fist",
+ "pixelfxId": "impacts/fist-slam",
+ "texture": "galboss:textures/fx/tohka_iron_fist",
+ "lightTexture": "galboss:textures/fx/tohka_iron_fist_light",
+ "frameW": 198,
+ "frameH": 176,
+ "cols": 10,
+ "rows": 2,
+ "frames": 19,
+ "fps": 20,
+ "loop": false,
+ "durationTicks": 19,
+ "pivot": {
+  "x": 97,
+  "y": 164
+ },
+ "anchor": "ground",
+ "defaultScale": 0.02,
+ "palette": [
+  "#1c0a10",
+  "#3d0f18",
+  "#6f1622",
+  "#a8222c",
+  "#d93a38",
+  "#ff7a5c",
+  "#ffc2a0",
+  "#fff0e0"
+ ],
+ "source": {
+  "repo": "https://github.com/patch-gg/pixelfx",
+  "license": "MIT",
+  "effect": "impacts/fist-slam",
+  "seed": 11,
+  "adaptedFrom": "Hugo Duprez / Sprite Fusion (MIT), Hollow Crown (MIT)，见 NOTICE.md"
+ },
+ "tint": "#ffaf9d",
+ "lightStrength": 2.1
+}

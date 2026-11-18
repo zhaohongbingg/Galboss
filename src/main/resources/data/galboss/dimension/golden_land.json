@@ -1,0 +1,16 @@
+{
+  "type": "galboss:golden_land",
+  "generator": {
+    "type": "minecraft:flat",
+    "settings": {
+      "layers": [
+        {"block": "minecraft:bedrock", "height": 1},
+        {"block": "minecraft:gold_block", "height": 3}
+      ],
+      "biome": "galboss:golden_land",
+      "lakes": false,
+      "features": false,
+      "structure_overrides": []
+    }
+  }
+}
