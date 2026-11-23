@@ -34,6 +34,16 @@ public class ModCreativeTabs {
                         output.accept(ModItems.BEATRICE_SPAWN_EGG.get());
                         // 郁子召唤的黑山羊仆从（只用于创造 / 调试）
                         output.accept(ModItems.BLACK_GOAT_SERVANT_SPAWN_EGG.get());
+                        // 炼狱七桩（贝阿朵莉切的七名仆从，精英怪）
+                        output.accept(ModItems.ASMODEUS_SPAWN_EGG.get());
+                        output.accept(ModItems.BEELZEBUB_SPAWN_EGG.get());
+                        output.accept(ModItems.BELPHEGOR_SPAWN_EGG.get());
+                        output.accept(ModItems.LEVIATHAN_SPAWN_EGG.get());
+                        output.accept(ModItems.LUCIFER_SPAWN_EGG.get());
+                        output.accept(ModItems.MAMMON_SPAWN_EGG.get());
+                        output.accept(ModItems.SATAN_SPAWN_EGG.get());
+                        // 七人手中共持的武器（也能自己拿着）
+                        output.accept(ModItems.PURGATORY_PILLAR.get());
                         // 终局奖励
                         output.accept(ModItems.TOHKA_BADGE.get());
                         output.accept(ModItems.REI_ARMBAND.get());
@@ -74,6 +84,13 @@ public class ModCreativeTabs {
                 event.accept(ModItems.ONABUTA_IKUKO_SPAWN_EGG.get());
                 event.accept(ModItems.BEATRICE_SPAWN_EGG.get());
                 event.accept(ModItems.BLACK_GOAT_SERVANT_SPAWN_EGG.get());
+                event.accept(ModItems.ASMODEUS_SPAWN_EGG.get());
+                event.accept(ModItems.BEELZEBUB_SPAWN_EGG.get());
+                event.accept(ModItems.BELPHEGOR_SPAWN_EGG.get());
+                event.accept(ModItems.LEVIATHAN_SPAWN_EGG.get());
+                event.accept(ModItems.LUCIFER_SPAWN_EGG.get());
+                event.accept(ModItems.MAMMON_SPAWN_EGG.get());
+                event.accept(ModItems.SATAN_SPAWN_EGG.get());
                 return;
             }
             // 手持武器进「战斗」页签（它们也是实际物品，顺便方便查看模型）
@@ -81,6 +98,7 @@ public class ModCreativeTabs {
                 event.accept(ModItems.IKUKO_KATANA.get());
                 event.accept(ModItems.REI_GUN.get());
                 event.accept(ModItems.BEATRICE_PIPE.get());
+                event.accept(ModItems.PURGATORY_PILLAR.get());
             }
         }
     }

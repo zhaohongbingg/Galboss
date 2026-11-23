@@ -23,6 +23,7 @@ import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import software.bernie.geckolib.animatable.GeoEntity;
 import software.bernie.geckolib.core.animatable.GeoAnimatable;
@@ -63,6 +64,15 @@ public class BlackGoatServantEntity extends Monster implements GeoEntity {
     private static final String ANIM_PREFIX = "animation.black_goat_servant.";
     private static final String CONTROLLER = "controller";
 
+    /**
+     * 步频基准：walk 动画在这个水平速度（格/tick）下按 1.0 倍速播放。
+     * 0.20 ≈ 正常步行；这只羊 MOVEMENT_SPEED = 0.30，实际跑起来会被放大到上限附近。
+     */
+    private static final double WALK_NOMINAL_SPEED = 0.20;
+    /** 播放速度上下限：太快会糊、太慢就回到「平移」。 */
+    private static final float WALK_SPEED_MIN = 0.85f;
+    private static final float WALK_SPEED_MAX = 2.4f;
+
     /** 需要服务的触发式动画：这些名字必须与 animation.json 里的键后缀一致。 */
     private static final List<String> TRIGGERED_ANIMS = List.of("attack", "cast", "hurt", "death");
 
@@ -93,8 +103,9 @@ public class BlackGoatServantEntity extends Monster implements GeoEntity {
      * 这里把真正结算推迟 8 tick，让「看起来撞上了」和「掉血」发生在同一拍。
      */
     private static final int ATTACK_WINDUP_TICKS = 8;
-    /** 延迟结算时允许的目标位移容差（格），防止目标瞬移后隔空挨打。 */
-    private static final double ATTACK_RESOLVE_RANGE = 3.5;
+    /** 贴近后才挥拳，接触帧给移动目标少量余量。 */
+    private static final double ATTACK_START_RANGE = 2.4;
+    private static final double ATTACK_RESOLVE_RANGE = 2.8;
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
 
@@ -141,9 +152,9 @@ public class BlackGoatServantEntity extends Monster implements GeoEntity {
     }
 
     public static AttributeSupplier.Builder createAttributes() {
-        // 数值按契约 §6.1：45 血 / 7 攻 / 0.30 移速 / 2 甲 / 0.25 击退抗性 / 32 追踪
+        // 数值：100 血 / 7 攻 / 0.30 移速 / 2 甲 / 0.25 击退抗性 / 32 追踪
         return Monster.createMonsterAttributes()
-                .add(Attributes.MAX_HEALTH, 45.0)
+                .add(Attributes.MAX_HEALTH, 100.0)
                 .add(Attributes.ATTACK_DAMAGE, 7.0)
                 .add(Attributes.MOVEMENT_SPEED, 0.30)
                 .add(Attributes.ARMOR, 2.0)
@@ -155,7 +166,19 @@ public class BlackGoatServantEntity extends Monster implements GeoEntity {
     protected void registerGoals() {
         // 优先级顺序按契约 §6.1：先别淹死，再打人，然后才是闲逛 / 看人 / 东张西望
         this.goalSelector.addGoal(0, new FloatGoal(this));
-        this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.0, true));
+        this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.0, true) {
+            @Override
+            protected double getAttackReachSqr(LivingEntity target) {
+                return ATTACK_START_RANGE * ATTACK_START_RANGE;
+            }
+
+            @Override
+            protected void checkAndPerformAttack(LivingEntity target, double distanceSqr) {
+                if (canStartPunch(target)) {
+                    super.checkAndPerformAttack(target, distanceSqr);
+                }
+            }
+        });
         this.goalSelector.addGoal(4, new WaterAvoidingRandomStrollGoal(this, 0.9));
         this.goalSelector.addGoal(5, new LookAtPlayerGoal(this, Player.class, 8.0f));
         this.goalSelector.addGoal(6, new RandomLookAroundGoal(this));
@@ -241,7 +264,8 @@ public class BlackGoatServantEntity extends Monster implements GeoEntity {
             checkLifeline();
         }
 
-        // 顶撞的延迟结算先走：即便这一 tick 开始施咒，之前起手的那一下也要落地
+        // 拳击前摇与诅咒互斥，结算帧也不切到施法动画。
+        boolean wasWindingUp = this.attackWindup > 0;
         tickAttackWindup();
 
         if (this.curseCastTicks > 0) {
@@ -251,7 +275,7 @@ public class BlackGoatServantEntity extends Monster implements GeoEntity {
 
         if (this.curseCd > 0) {
             this.curseCd--;
-        } else {
+        } else if (!wasWindingUp) {
             tryStartCurse();
         }
     }
@@ -326,7 +350,7 @@ public class BlackGoatServantEntity extends Monster implements GeoEntity {
      */
     @Override
     public boolean doHurtTarget(Entity target) {
-        if (this.level().isClientSide) {
+        if (this.level().isClientSide || !(target instanceof LivingEntity living) || !this.canStartPunch(living)) {
             return false;
         }
         this.triggerAnim(CONTROLLER, "attack");
@@ -335,6 +359,13 @@ public class BlackGoatServantEntity extends Monster implements GeoEntity {
         this.pendingMeleeTarget = target;
         this.attackWindup = ATTACK_WINDUP_TICKS;
         return true;
+    }
+
+    private boolean canStartPunch(LivingEntity target) {
+        return this.attackWindup == 0 && this.curseCastTicks == 0
+                && target.isAlive() && this.canAttack(target)
+                && this.distanceToSqr(target) <= ATTACK_START_RANGE * ATTACK_START_RANGE
+                && this.hasLineOfSight(target);
     }
 
     private void tickAttackWindup() {
@@ -346,11 +377,10 @@ public class BlackGoatServantEntity extends Monster implements GeoEntity {
         }
         Entity target = this.pendingMeleeTarget;
         this.pendingMeleeTarget = null;
-        if (target == null || !target.isAlive()) {
-            return;
-        }
-        // 接触帧那一刻目标已经跑远就空挥，不要隔空掉血
-        if (this.distanceTo(target) > ATTACK_RESOLVE_RANGE) {
+        // 接触帧仍只判定起手对象；离开拳距、躲到墙后或失去攻击资格均可闪避。
+        if (!(target instanceof LivingEntity living) || !living.isAlive() || !this.canAttack(living)
+                || this.distanceToSqr(living) > ATTACK_RESOLVE_RANGE * ATTACK_RESOLVE_RANGE
+                || !this.hasLineOfSight(living)) {
             return;
         }
         super.doHurtTarget(target);
@@ -429,9 +459,16 @@ public class BlackGoatServantEntity extends Monster implements GeoEntity {
         }
         if (state.isMoving()) {
             state.getController().setAnimation(RawAnimation.begin().thenLoop(ANIM_PREFIX + "walk"));
+            // 步频跟地面速度对齐。walk 是模型交付时烘焙好的 1.6 秒循环，
+            // 但这只羊的移动速度是 0.30（约玩家步行 3 倍），固定 1.6 秒根本跟不上位移，
+            // 看起来就是「腿慢慢晃、身体在平移」。按实际水平速度缩放播放速度即可。
+            double speed = this.getDeltaMovement().horizontalDistance();
+            float scale = (float) Mth.clamp(speed / WALK_NOMINAL_SPEED, WALK_SPEED_MIN, WALK_SPEED_MAX);
+            state.setControllerSpeed(scale);
             return PlayState.CONTINUE;
         }
         state.getController().setAnimation(RawAnimation.begin().thenLoop(ANIM_PREFIX + "idle"));
+        state.setControllerSpeed(1.0f);
         return PlayState.CONTINUE;
     }
 

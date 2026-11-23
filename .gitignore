@@ -29,6 +29,7 @@ run/
 # 它们是流水线的输入（模型贴图源），删了就没法重新导出模型。
 tools/blockbench/session.json
 tools/blockbench/_state*.txt
+tools/blockbench/_purgatory_stats.json
 tools/blockbench/_preview/
 tools/blockbench/_backup_*/
 tools/blockbench/_archive_*/

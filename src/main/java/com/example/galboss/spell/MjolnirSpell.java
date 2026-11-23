@@ -1,7 +1,8 @@
 package com.example.galboss.spell;
 
-import com.example.galboss.fx.PixelfxSlugs;
 import com.example.galboss.fx.PixelfxFx;
+import com.example.galboss.fx.PixelfxSlugs;
+import com.example.galboss.particle.ModParticles;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -15,35 +16,30 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Mjolnir（索尔的雷霆之锤）：预警圈 → 锤影砸落 → 内外双环伤害。
- *
- * <p>落点在**构造时**定死（= 施法那一刻目标站的位置），预警期间不会再跟人走：
- * 跑动必躲、站桩必吃。这条规则写进注释，避免以后有人「顺手改成追踪」把它的手感毁掉。
+ * Mjolnir（索尔的雷霆之锤）：收缩预警圈 → 战锤砸落 → 内外双环重击与余震冲击波。
  */
 public class MjolnirSpell extends Spell {
 
-    /** 预警时长。 */
     private static final int WARN = 24;
-    /** 内圈半径 / 伤害。 */
     private static final double INNER_RADIUS = 6.0;
     private static final float INNER_DAMAGE = 10.0f;
-    /** 外圈半径 / 伤害。 */
     private static final double OUTER_RADIUS = 12.0;
     private static final float OUTER_DAMAGE = 5.0f;
 
     private final Vec3 at;
-    /**
-     * 命中记录：内圈和外圈**共用同一个集合**。
-     *
-     * <p>内圈是外圈的子集，如果两边各用一个集合，站内圈的人会先吃 10 点再吃 5 点
-     * （实测就是这么发现的）。共用集合后，内圈命中的人在外圈结算时会被跳过。
-     */
+    private final float impactYaw;
     private final Set<UUID> hit = new HashSet<>();
     private boolean landed;
 
     public MjolnirSpell(Level level, Vec3 at, @Nullable LivingEntity caster) {
         super(level, at, caster);
         this.at = at;
+        if (caster != null) {
+            Vec3 fromCaster = at.subtract(caster.position());
+            this.impactYaw = directionToFxYaw(fromCaster);
+        } else {
+            this.impactYaw = 0.0f;
+        }
     }
 
     public static void cast(Level level, Vec3 at, @Nullable LivingEntity caster) {
@@ -57,42 +53,60 @@ public class MjolnirSpell extends Spell {
                 SpellFx.circle(this.level, this.at, INNER_RADIUS, SpellFx.GOLD);
                 SpellFx.circle(this.level, this.at, OUTER_RADIUS, SpellFx.SPARK);
                 SpellFx.cross(this.level, this.at, INNER_RADIUS);
+
+                // 随蓄力进度向外收缩的倒计时提示圈
+                double shrinkRatio = 1.0 - (this.age / (double) WARN);
+                double countdownRadius = INNER_RADIUS + (OUTER_RADIUS - INNER_RADIUS) * shrinkRatio;
+                SpellFx.circle(this.level, this.at, countdownRadius, SpellFx.GOLD);
+            }
+            if (this.age % 6 == 0 && this.level instanceof ServerLevel server) {
+                server.sendParticles(ModParticles.GOLDEN_BUTTERFLY.get(),
+                        this.at.x, this.at.y + 0.4, this.at.z,
+                        4, 2.5, 0.6, 2.5, 0.02);
             }
             return;
         }
-        if (this.landed) {
-            return;
-        }
-        this.landed = true;
-        // 锤影砸落：epitaph_mjolnir = 方头战锤（现烘自 impacts/hammer-smash v2，27 帧 / 1.3s）。
-        // v2 针对 MC 场景重做过：修掉首帧锤柄被画布上沿裁切（改成蓄力微抬 + 侧向挥砸弧线），
-        // 加 0.10~0.25s 的速度拖尾楔补 20fps 的帧间空隙，锤头加宽到 64×40 并加 1px 深色外描边
-        // （明亮地形下也认得出轮廓），命中加挤压顿帧 + 锤面电弧，收尾用像素侵蚀消散而不是淡出。
-        // 画布 220×254，锚点在锤头底面（y = 0），蓄力位 y ≈ -156 —— 所以落点就是地面，不用抬高。
-        // 缩放 1.4：锤头 64px → 0.04 × 1.4 × 64 ≈ 3.6 格宽；冲击环 r=104px → 5.8 格，和 6 格内圈判定对齐；
-        // 挥砸弧线 156px → 8.7 格，读得出「从头顶抡下来」。
-        PixelfxFx.play(this.level, this.at.add(0.0, 0.05, 0.0), PixelfxSlugs.EPITAPH_MJOLNIR, 1.4f, 0.0f);
-        // 落地冲击环保留 tohka_bell_wave（0.021 / 248，本来就是专用地面冲击件）
-        PixelfxFx.play(this.level, this.at.add(0.0, 0.05, 0.0), PixelfxSlugs.TOHKA_BELL_WAVE, 2.2f, 0.0f);
-        if (this.level instanceof ServerLevel server) {
-            server.playSound(null, this.at.x, this.at.y, this.at.z, SoundEvents.ANVIL_LAND,
-                    SoundSource.HOSTILE, 1.4f, 0.5f);
-            server.playSound(null, this.at.x, this.at.y, this.at.z, SoundEvents.LIGHTNING_BOLT_IMPACT,
-                    SoundSource.HOSTILE, 1.0f, 0.8f);
-        }
-        SpellFx.shake(this.level, this.at, 56.0, 0.6f, 10);
 
-        int inner = SpellFx.magic(this.level, this.at, INNER_RADIUS, INNER_DAMAGE,
-                this.caster, this.hit, 40, 1, 0.4);
-        // 外圈复用同一个 hit 集合：内圈吃过的不会再吃一遍
-        int outer = SpellFx.magic(this.level, this.at, OUTER_RADIUS, OUTER_DAMAGE,
-                this.caster, this.hit, 0, 0, 0.2);
-        com.example.galboss.GalBoss.LOGGER.debug("[Spell] mjolnir inner={} outer={}", inner, outer);
+        // 砸落主冲击与两段扩散余震
+        if (!this.landed) {
+            this.landed = true;
+            PixelfxFx.play(this.level, this.at.add(0.0, 0.05, 0.0),
+                    PixelfxSlugs.EPITAPH_MJOLNIR, 1.45f, this.impactYaw);
+            PixelfxFx.play(this.level, this.at.add(0.0, 0.05, 0.0),
+                    PixelfxSlugs.TOHKA_BELL_WAVE, 2.2f, this.impactYaw);
+            PixelfxFx.play(this.level, this.at.add(0.0, 0.06, 0.0),
+                    PixelfxSlugs.EPITAPH_SPEAR_IMPACT, 1.35f, this.impactYaw);
+
+            if (this.level instanceof ServerLevel server) {
+                server.playSound(null, this.at.x, this.at.y, this.at.z, SoundEvents.ANVIL_LAND,
+                        SoundSource.HOSTILE, 1.4f, 0.5f);
+                server.playSound(null, this.at.x, this.at.y, this.at.z, SoundEvents.LIGHTNING_BOLT_IMPACT,
+                        SoundSource.HOSTILE, 1.0f, 0.8f);
+                server.sendParticles(ModParticles.BURST_STAR.get(),
+                        this.at.x, this.at.y + 0.5, this.at.z, 3, 0.4, 0.3, 0.4, 0.0);
+                server.sendParticles(ModParticles.BURST_BUTTERFLY.get(),
+                        this.at.x, this.at.y + 0.4, this.at.z, 10, 1.6, 0.4, 1.6, 0.0);
+            }
+            SpellFx.shake(this.level, this.at, 56.0, 0.75f, 12);
+
+            int inner = SpellFx.magic(this.level, this.at, INNER_RADIUS, INNER_DAMAGE,
+                    this.caster, this.hit, 40, 1, 0.45);
+            int outer = SpellFx.magic(this.level, this.at, OUTER_RADIUS, OUTER_DAMAGE,
+                    this.caster, this.hit, 0, 0, 0.25);
+            com.example.galboss.GalBoss.LOGGER.debug("[Spell] mjolnir inner={} outer={}", inner, outer);
+        } else {
+            int afterImpact = this.age - WARN - 1;
+            if (afterImpact == 2 || afterImpact == 4 || afterImpact == 6) {
+                // 余震沿地面从内圈推到外圈；只有砸落瞬间结算伤害。
+                double radius = INNER_RADIUS + (OUTER_RADIUS - INNER_RADIUS) * afterImpact / 6.0;
+                SpellFx.circle(this.level, this.at, radius, SpellFx.SPARK, 24);
+            }
+        }
     }
 
     @Override
     public int durationTicks() {
-        return WARN + 10;
+        return WARN + 12;
     }
 
     @Override

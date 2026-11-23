@@ -9,12 +9,14 @@ import com.example.galboss.network.ModNetwork;
 import com.example.galboss.particle.ModParticles;
 import com.example.galboss.spell.AegisSpell;
 import com.example.galboss.spell.ChainLightningSpell;
+import com.example.galboss.spell.ChessboardFieldSpell;
 import com.example.galboss.spell.ChessboardJudgementSpell;
 import com.example.galboss.spell.GoldenRainSpell;
 import com.example.galboss.spell.GungnirSpell;
 import com.example.galboss.spell.LightningStrikeSpell;
 import com.example.galboss.spell.MjolnirSpell;
 import com.example.galboss.spell.SpellEngine;
+import com.example.galboss.spell.SoulChainSpell;
 import com.example.galboss.spell.StormSpell;
 import com.example.galboss.spell.WitchDomainSpell;
 import com.example.galboss.ritual.BodySeal;
@@ -106,6 +108,8 @@ public final class GalBossCommand {
                     (s, p, ahead) -> LightningStrikeSpell.cast(s.getLevel(), p.position(), null)),
             new SpellEntry("chain", "链雷（最多跳 3 次，伤害递减）",
                     (s, p, ahead) -> SpellEngine.cast(new ChainLightningSpell(s.getLevel(), ahead, null, p))),
+            new SpellEntry("soulchain", "魂链（把周围怪物串成共伤链，10 秒）",
+                    (s, p, ahead) -> SoulChainSpell.cast(s.getLevel(), p.position(), p)),
             new SpellEntry("storm", "雷云（半径 24，持续随机落雷）",
                     (s, p, ahead) -> StormSpell.cast(s.getLevel(), p.position(), null)),
             new SpellEntry("gungnir", "神枪贯穿（24 格直线判定带）",
@@ -119,7 +123,9 @@ public final class GalBossCommand {
             new SpellEntry("rain", "金雨（整区块持续落点）",
                     (s, p, ahead) -> GoldenRainSpell.cast(s.getLevel(), p.position(), null)),
             new SpellEntry("domain", "魔女领域（收缩审判圈，站圈外挨打）",
-                    (s, p, ahead) -> WitchDomainSpell.cast(s.getLevel(), p.position(), null)));
+                    (s, p, ahead) -> WitchDomainSpell.cast(s.getLevel(), p.position(), null)),
+            new SpellEntry("field", "棋盘场地（32×32 黑白交替，踩危险格挨打）",
+                    (s, p, ahead) -> ChessboardFieldSpell.cast(s.getLevel(), p.position(), null)));
 
     /** {@code /galboss help} 打印的清单。加子命令时记得同步这一行。 */
     private static final List<String> SUBCOMMANDS = List.of(

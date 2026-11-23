@@ -2,6 +2,7 @@ package com.example.galboss;
 
 import com.example.galboss.block.ModBlocks;
 import com.example.galboss.config.GalBossConfig;
+import com.example.galboss.config.GalBossMusicConfig;
 import com.example.galboss.command.GalBossCommand;
 import com.example.galboss.effect.ModEffects;
 import com.example.galboss.entity.ModEntities;
@@ -12,6 +13,7 @@ import com.example.galboss.item.PetGiftTable;
 import com.example.galboss.network.ModNetwork;
 import com.example.galboss.particle.ModParticles;
 import com.example.galboss.pet.PetTradeTable;
+import com.example.galboss.sound.ModSounds;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.AddReloadListenerEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -34,6 +36,9 @@ public class GalBoss {
 
         // 整合包适配配置（boss 减伤 / 单次限伤），落在 config/galboss-common.toml
         context.registerConfig(ModConfig.Type.COMMON, GalBossConfig.SPEC);
+        // 客户端 BGM 配置（开关 / 音量 / 黄金乡里的优先级），落在 config/galboss-client.toml。
+        // 音乐是纯本地表现，所以不放进 COMMON：联机时每个玩家自己调，服务端不参与。
+        context.registerConfig(ModConfig.Type.CLIENT, GalBossMusicConfig.SPEC);
 
         ModNetwork.register();
 
@@ -53,6 +58,8 @@ public class GalBoss {
         ModEffects.register(modEventBus);
         ModParticles.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
+        // 两条 BGM（黄金乡主题 / 幻象协调者战斗曲），ogg 在 assets/galboss/sounds/music/
+        ModSounds.register(modEventBus);
 
         MinecraftForge.EVENT_BUS.register(this);
         

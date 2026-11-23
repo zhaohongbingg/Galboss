@@ -301,6 +301,82 @@ node verify_item_model.mjs
 - 已知：源模型头部右侧有一块离头约 3 单位的独立小块（两种欧拉顺序下都存在），是交付模型自带的，
   不是转换引入的；要处理就在 Blockbench 里调整后再重新导入
 
+### 七大罪 YSM 七人 + 炼狱之柱（GeoItem 手持）
+
+第二条外部交付线：七位「炼狱之桩」（贝阿朵莉切的七名仆从）+ 一根炼狱之柱。
+这次的源不是 `.bbmodel` 而是 **YSM 模型包**（`Characters/<Id>/YSM-source/`），
+所以走 `import_purgatory_stakes.mjs` 而不是 `import_bbmodel.mjs`：
+
+```powershell
+# 默认读 <repo>/../_incoming/purgatory-stakes（交付 ZIP 的解压目录，不入库）
+node import_purgatory_stakes.mjs
+node import_purgatory_stakes.mjs --src "D:\some\where\purgatory-stakes"
+```
+
+三条结论（都踩过一次，别照着感觉改）：
+
+1. **贴图不降采样**。YSM 的 `main.json` 已经是 bedrock geo（`texture_width/height` = 512×256 是 UV 空间），
+   而交付的 PNG 是 2048×1024。GeckoLib 把 uv 归一化后再采样，PNG 保持 2048×1024 就是白拿 4 倍纹理密度；
+   降成 512×256 才是丢细节（贝阿朵莉切那条线降采样是因为源图 4096² 对 512² 的 UV 空间，
+   这里不一样，别套用）。
+2. **uv 是逐面形式**（`{north:{uv,uv_size},…}`，465 个方块里 463 个），不是 box uv。
+   GeckoLib 4.4.2 的 `UVUnion` 两种都收；`pose_tool.mjs` 也是按逐面读的。
+3. **动画必须清 molang**。`main.animation.json` 里有一个**不存在的 `molang` 伪骨骼**，
+   以及 `run` 的 `Root` 通道写着 `0.4*ysm.head_yaw`。脚本会把伪骨骼丢掉、非数字关键帧值置 0 并计数；
+   顺带把 `lerp_mode: catmullrom` 一起丢掉（GeckoLib 4.4.2 只做线性插值）。
+   rotation 通道保持**绝对值**语义原样搬，不要把 geo 里的静止姿态（手臂 ±15.5°）加回去。
+
+产物：
+- `geo/purgatory_stake_<id>.geo.json` ×7（314–316 骨 / 369–467 块，只改了 identifier）
+- `textures/entity/purgatory_stake_<id>.png` ×7（2048×1024，原生）
+- `animations/purgatory_stake.animation.json`（1 份共用，6 段：idle/walk/run/hurt/attack/death）
+- `geo/item/purgatory_pillar.geo.json` + `textures/item/purgatory_pillar.png`（512×256）
+
+**柱子走 GeoItem，不走 `geo_to_item_model.mjs`**：它 968 个方块里 **819 个带自由角度旋转**
+（螺旋是斜置薄板拼的），`geo_to_item_model.mjs` 会把这些旋转全丢掉 —— 柱子会变成一个没有螺旋的疙瘩。
+所以 `PurgatoryPillarItem implements GeoItem` + `GeoItemRenderer`（bedrock geo 通路，不受角度限制），
+物品模型 `models/item/purgatory_pillar.json` 只写 `builtin/entity` + `display`。
+手上的挂法仍是老规矩：`BlockAndItemGeoLayer` + `RightHandLocator`（和烟斗同一个挂点）。
+
+⚠ GeoItem 的坐标系和原版 elements 不同：**geo 的原点在握柄中心**（交付约定），
+不是原版物品的 `(8,8,8)` 中心。所以 `display.translation/rotation` 是绕握柄转的，
+`pose_tool.mjs --item-geo` 也按 `center = (0,0,0)` 处理。
+
+**朝向别再靠感觉调**（第一版竖着插在手上，被反馈成「像插在背后」）：人物正面是 **-Z**
+（`pose_tool` 的 `front` 相机看到的就是脸，说明脸朝 -Z）。但**离屏推出来的角度只对 NPC 骨骼帧有效**：
+
+| 用在谁身上 | display 槽位 | 值（实机标定） |
+|---|---|---|
+| NPC（`RightHandLocator` 骨骼帧） | `head` | `rotation [-85,0,15]`、`translation [0,0,0]` |
+| 玩家第三人称 | `thirdperson_*` | `[0,0,0]` —— 原版手持帧本身就让 +Y 朝前 |
+| 玩家第一人称 | `firstperson_*` | `rotation [-55,0,0]` —— 原版第一人称里 +Y 是竖的 |
+
+⚠ 三个坑，全都在实机里踩过：
+
+1. **NPC 骨骼帧 ≠ 原版手持帧**，两者差接近一个直角。三处写同一个 `-85` 的结果是：
+   NPC 手里横持正确，玩家手里是一根朝下吊着的柱子。
+2. **`translation` 对 NPC 必须为 0**。柱子模型原点就是握把中心、`RightHandLocator` 就在手心，
+   给 `[-4,0,-2]` 会让握把离开手心 —— 实机看就是「武器错位」。
+3. 只靠 `pose_tool` 离线推角度**推不出玩家手**：那个工具复刻的是骨骼帧。玩家手的三套数值
+   只能在游戏里标定（做法见下），`verify_purgatory.mjs` 现在对三个槽位分别设了护栏。
+
+标定手法（一次搞定，不用一轮一轮重启）：临时注册 N 个同模型、只有 `display` 不同的探针物品，
+`/item replace entity @s weapon.mainhand with galboss:pillar_probe_K` 就能在第一人称逐个看；
+第三人称则把探针塞给盔甲架（`HandItems:[{id:"galboss:pillar_probe_K",Count:1b},{}]`）。
+这一次的探针是临时的，标完已删。
+
+柱子有两段动画：`spin`（常态循环：金螺旋自转 + 流苏轻晃）与 `use`（右键一次性 0.45 秒，
+柱体沿 **+Y（柱尖方向）** 向前突 2.6 单位再回收 —— 是「突刺」，不是「后坐」；写成负 Y 会变成开枪回弹）。
+预览直接拿柱子 geo 当主模型：
+
+```powershell
+node pose_tool.mjs ../../src/main/resources/assets/galboss/geo/item/purgatory_pillar.geo.json `
+  --anim ../../src/main/resources/assets/galboss/animations/item/purgatory_pillar.animation.json `
+  --name animation.purgatory_pillar.use --t 0.15 `
+  --texture ../../src/main/resources/assets/galboss/textures/item/purgatory_pillar.png `
+  --render _preview/pillar_use.png --views side
+```
+
 ### 动画迭代：pose_tool.mjs（不用 Blockbench）
 
 Blockbench 靠 MCP 一次改一根骨骼太慢，而「抬手会不会穿模」「走路腿穿过裙子」本质是几何问题。
@@ -324,6 +400,27 @@ node pose_tool.mjs <geo> --anim <anim> --name animation.beatrice.walk --t 0.3 `
 
 求值语义与 GeckoLib 4.4.2 对齐：rotation 通道是**绝对**值、position 是偏移；关键帧线性插值；
 Molang 只支持 `Math.sin/cos/abs/max/min`（角度制）+ `query.anim_time`。
+
+七位炼狱之桩接进来时补了三个能力（都是为了「柱子到底有没有挂到手上」这件事）：
+
+```powershell
+# 1. GeoItem 挂载预览：柱子不是原版 elements，走 --item-geo
+node pose_tool.mjs ../../src/main/resources/assets/galboss/geo/purgatory_stake_asmodeus.geo.json `
+  --anim ../../src/main/resources/assets/galboss/animations/purgatory_stake.animation.json `
+  --name animation.purgatory_stake.idle --t 1.0 `
+  --texture ../../src/main/resources/assets/galboss/textures/entity/purgatory_stake_asmodeus.png `
+  --item-geo ../../src/main/resources/assets/galboss/geo/item/purgatory_pillar.geo.json `
+  --item-texture ../../src/main/resources/assets/galboss/textures/item/purgatory_pillar.png `
+  --item-disp-file _preview/disp-pillar.json --anchor RightHandLocator `
+  --render _preview/stake_pillar.png --views front,three
+```
+
+- **`--item-geo`**：把 bedrock geo 按 `display` 变换挂到锚点骨骼上（`--item` 那条只读原版 elements）。
+  传 `--item-disp-file` 时读单个 `{rotation,translation,scale}`（省得命令行引号地狱）。
+  GeoItem 的模型原点是握柄中心，所以中心取 `(0,0,0)`，不是原版物品的 `(8,8,8)`。
+- **标量通道**：`"scale": 1`（YSM 常这么写）按均匀缩放展开成 `[v,v,v]`，以前会直接 `TypeError`。
+- **`{pre, post}` 关键帧**：以前只认裸数组，遇到 YSM 的 `{"0.0": {"post": [...]}}` 会崩；
+  现在取 `post`（只有 `pre` 时取 `pre`），与线性插值语义一致。
 
 **这次用它查出来的两件事**（数值都是立方体级真穿透对数）：
 

@@ -29,8 +29,9 @@ public class StormSpell extends Spell {
     private static final double FIELD_RADIUS = 24.0;
     /** 雷云期间的落雷伤害（比标准落雷低，靠数量）。 */
     private static final float STORM_DAMAGE = 6.0f;
-    /** 雷云期间的预警时长（压缩到 10 tick）。 */
-    private static final int STORM_TELEGRAPH = 10;
+    /** 双落雷同时锁点，留 14 tick 给玩家看清两侧预警。 */
+    private static final int STORM_TELEGRAPH = 14;
+    private static final double PAIRED_OFFSET = 3.2;
 
     private boolean curtainUp;
 
@@ -60,14 +61,26 @@ public class StormSpell extends Spell {
             return;
         }
         Vec3 point = this.pickStrikePoint();
-        if (point != null) {
-            SpellEngine.cast(new LightningStrikeSpell(this.level, point, this.caster,
-                    STORM_DAMAGE, STORM_TELEGRAPH));
+        double dx = point.x - this.origin.x;
+        double dz = point.z - this.origin.z;
+        double pairedRange = FIELD_RADIUS - PAIRED_OFFSET;
+        if ((this.age / STRIKE_INTERVAL) % 2 == 1 && dx * dx + dz * dz <= pairedRange * pairedRange) {
+            // 双落雷左右夹击，两个判定圈不重叠，中间留出安全走廊。
+            double angle = this.level.random.nextDouble() * Math.PI * 2.0;
+            Vec3 offset = new Vec3(Math.cos(angle) * PAIRED_OFFSET, 0.0, Math.sin(angle) * PAIRED_OFFSET);
+            this.queueStrike(point.add(offset));
+            this.queueStrike(point.subtract(offset));
+        } else {
+            this.queueStrike(point);
         }
     }
 
+    private void queueStrike(Vec3 point) {
+        SpellEngine.cast(new LightningStrikeSpell(this.level, point, this.caster,
+                STORM_DAMAGE, STORM_TELEGRAPH));
+    }
+
     /** 优先劈人（随机一个场内玩家脚下），没人就随机场地一点。 */
-    @Nullable
     private Vec3 pickStrikePoint() {
         List<Player> players = SpellFx.players(this.level, this.origin, FIELD_RADIUS);
         if (!players.isEmpty()) {

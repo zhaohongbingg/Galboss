@@ -2,6 +2,13 @@ package com.example.galboss.client.renderer.layer;
 
 import com.example.galboss.entity.BeatriceEntity;
 import com.example.galboss.item.ModItems;
+import com.example.galboss.particle.ModParticles;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import software.bernie.geckolib.cache.object.GeoBone;
@@ -9,34 +16,18 @@ import software.bernie.geckolib.renderer.GeoRenderer;
 import software.bernie.geckolib.renderer.layer.BlockAndItemGeoLayer;
 
 /**
- * 把烟斗作为**物品**渲染在右手上 —— 与 {@link IkukoKatanaLayer} / {@link ReiGunLayer} 同一套做法。
- *
- * <p>为什么不用「独立 GeoModel + 手算矩阵」：烟斗有自己的贴图，塞不进角色那张 64x128 的图集；
- * 而且独立 GeoModel 的位置要靠一串魔法偏移常量对齐，角色动画一动就飘。
- * 走 {@link BlockAndItemGeoLayer} 之后，位置与朝向交给原版物品系统的
- * {@link ItemDisplayContext} 标准握持变换，模型里也没有骨骼，角色动画不会按名字套到烟斗上。
- *
- * <p>两个必须守住的约定（细节见 {@link IkukoKatanaLayer} 的类注释，那里踩过坑）：
- * <ul>
- *   <li>挂点骨骼 {@code RightHandLocator} 的 rotation 必须保持全 0。
- *       BlockAndItemGeoLayer 会把目标骨骼的旋转再应用一次，转 θ 会变成 2θ；</li>
- *   <li>握持姿态与缩放只写在 models/item/beatrice_pipe.json 的 display 块里，
- *       该文件由 tools/blockbench 从 geo/beatrice_pipe.geo.json 生成，别手改。</li>
- * </ul>
- *
- * <p>骨骼是「定位器」而不是「武器骨」：动画里不要驱动它，驱动 {@code right_hand} 之类的
- * 手臂骨骼，手腕的动作自然会带着烟斗走。
+ * 贝阿朵莉切右手长烟斗渲染层：渲染武器模型并从烟斗处持续飘出紫金魔力烟缕。
  */
 public class BeatricePipeLayer extends BlockAndItemGeoLayer<BeatriceEntity> {
 
-    /** 烟斗挂在角色模型的这个骨骼上（geo 里存在，rotation 全 0）。 */
     private static final String ANCHOR = "RightHandLocator";
+
+    private int lastEmitTick = -1;
 
     public BeatricePipeLayer(GeoRenderer<BeatriceEntity> renderer) {
         super(renderer);
     }
 
-    /** 只有挂点骨骼上渲染烟斗，其余骨骼返回 null 表示不渲染。 */
     @Override
     protected ItemStack getStackForBone(GeoBone bone, BeatriceEntity animatable) {
         return ANCHOR.equals(bone.getName())
@@ -44,9 +35,48 @@ public class BeatricePipeLayer extends BlockAndItemGeoLayer<BeatriceEntity> {
                 : null;
     }
 
-    /** 用第三人称右手的标准握持姿态（display 块里对应的那组变换）。 */
     @Override
     protected ItemDisplayContext getTransformTypeForStack(GeoBone bone, ItemStack stack, BeatriceEntity animatable) {
         return ItemDisplayContext.THIRD_PERSON_RIGHT_HAND;
+    }
+
+    @Override
+    public void renderForBone(PoseStack poseStack, BeatriceEntity animatable, GeoBone bone,
+                              RenderType renderType, MultiBufferSource bufferSource, VertexConsumer buffer,
+                              float partialTick, int packedLight, int packedOverlay) {
+        super.renderForBone(poseStack, animatable, bone, renderType, bufferSource, buffer,
+                partialTick, packedLight, packedOverlay);
+
+        if (!ANCHOR.equals(bone.getName()) || !animatable.isAlive() || animatable.level() == null) {
+            return;
+        }
+        if (animatable.tickCount == this.lastEmitTick) {
+            return;
+        }
+        this.lastEmitTick = animatable.tickCount;
+
+        // 每 4 tick 从右手烟斗斗钵处升起一缕淡紫烟雾与金色余烬
+        if (animatable.tickCount % 4 == 0) {
+            float bodyYawRad = animatable.yBodyRot * Mth.DEG_TO_RAD;
+            double forwardX = -Mth.sin(bodyYawRad);
+            double forwardZ = Mth.cos(bodyYawRad);
+            double rightX = -forwardZ;
+            double rightZ = forwardX;
+
+            double bowlX = animatable.getX() + forwardX * 0.58 + rightX * 0.34;
+            double bowlY = animatable.getY() + animatable.getBbHeight() * 0.68
+                    + Mth.sin(animatable.tickCount * 0.12f) * 0.03;
+            double bowlZ = animatable.getZ() + forwardZ * 0.58 + rightZ * 0.34;
+
+            animatable.level().addParticle(ParticleTypes.WITCH,
+                    bowlX, bowlY, bowlZ,
+                    forwardX * 0.008, 0.024, forwardZ * 0.008);
+
+            if (animatable.tickCount % 12 == 0) {
+                animatable.level().addParticle(ModParticles.BURST_DOT.get(),
+                        bowlX, bowlY + 0.05, bowlZ,
+                        rightX * 0.006, 0.018, rightZ * 0.006);
+            }
+        }
     }
 }

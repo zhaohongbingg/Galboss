@@ -1,10 +1,13 @@
 package com.example.galboss.spell;
 
-import com.example.galboss.fx.PixelfxSlugs;
 import com.example.galboss.fx.PixelfxFx;
+import com.example.galboss.fx.PixelfxSlugs;
+import com.example.galboss.particle.ModParticles;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
@@ -18,43 +21,22 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * 魔女领域：以施法点为中心张开一个<b>持续收缩</b>的审判圈。
- *
- * <h2>机制</h2>
- * 圈从半径 8 缩到 1.5（正好覆盖一个区块的对角范围），<b>站在圈外就挨打</b>。
- * 这是唯一一个「强制位移」而不是「强制躲闪」的招式：别的招式要你走开，
- * 这个要你往中间挤 —— 和她的蝶群（追着你跑）刚好一推一拉，逼玩家在两种压力间切换。
- *
- * <h2>为什么不直接结算全场</h2>
- * 收缩给了明确的进度反馈（圈每 tick 都在变小），玩家能读出「还有多久收完」。
- * 一次性大圈伤害只会变成「听到声音就跑」，没有节奏感。
- *
- * <h2>收尾</h2>
- * 收到底时中心炸一发（{@code epitaph_aegis} 立牌 + 冲击环），圈内的人吃满伤害 ——
- * 「挤进来」不是免费的，最后一秒还得再扛一下。
+ * 魔女领域：以施法点为中心张开一个持续收缩的审判圈，驱赶玩家向圆心聚拢后引爆。
  */
 public class WitchDomainSpell extends Spell {
 
-    /** 起始半径（格）。8 = 直径 16，正好一个区块。 */
     private static final double RADIUS_START = 8.0;
-    /** 收缩到的最终半径。 */
     private static final double RADIUS_END = 1.5;
-    /** 张开到开始收缩之间的停顿（tick），给玩家反应时间。 */
     private static final int WINDUP = 20;
-    /** 收缩过程时长（tick）。 */
     private static final int SHRINK = 100;
-    /** 圈外扣血的间隔（tick）。 */
     private static final int TICK_DAMAGE_INTERVAL = 10;
-    /** 圈外每次扣血。100 tick / 10 = 10 次，全吃 = 25。 */
     private static final float OUTSIDE_DAMAGE = 2.5f;
-    /** 收尾时圈内伤害。 */
     private static final float FINAL_DAMAGE = 10.0f;
 
-    /** 审判圈颜色（金色）。 */
-    private static final DustParticleOptions RING = new DustParticleOptions(new Vector3f(1.0f, 0.82f, 0.28f), 1.1f);
+    private static final DustParticleOptions RING = new DustParticleOptions(new Vector3f(1.0f, 0.82f, 0.28f), 1.15f);
+    private static final DustParticleOptions CORE_SAFE = new DustParticleOptions(new Vector3f(1.0f, 0.94f, 0.65f), 0.95f);
 
     private final Vec3 center;
-    /** 玩家 UUID → 上次圈外扣血的 age。 */
     private final Map<UUID, Integer> lastHit = new HashMap<>();
     private boolean finished;
 
@@ -67,7 +49,6 @@ public class WitchDomainSpell extends Spell {
         SpellEngine.cast(new WitchDomainSpell(level, origin, caster));
     }
 
-    /** 当前审判圈半径。 */
     private double currentRadius() {
         if (this.age <= WINDUP) {
             return RADIUS_START;
@@ -83,32 +64,50 @@ public class WitchDomainSpell extends Spell {
         }
         double radius = this.currentRadius();
 
-        // 圈本身：每 2 tick 重画一次（半径一直在变，画太密会糊成一片）
+        // 外围收缩结界 + 中心最终安全核心环
         if (this.age % 2 == 0) {
             SpellFx.circle(server, this.center, radius, RING);
+        }
+        if (this.age % 4 == 0 && radius > RADIUS_END + 0.4) {
+            SpellFx.circle(server, this.center, RADIUS_END, CORE_SAFE);
+        }
+
+        // 地面魔法阵随收缩半径同步缩放刷新
+        if (this.age == 1 || (this.age % 24 == 0 && this.age < WINDUP + SHRINK - 10)) {
+            float circleScale = (float) Math.max(0.65, 3.0 * (radius / RADIUS_START));
+            PixelfxFx.play(server, this.center.add(0.0, 0.08, 0.0),
+                    PixelfxSlugs.TOHKA_CONVOCATION_CIRCLE, circleScale, this.age * 1.5f);
         }
 
         if (this.age == 1) {
             server.playSound(null, this.center.x, this.center.y, this.center.z,
-                    net.minecraft.sounds.SoundEvents.BEACON_ACTIVATE,
-                    net.minecraft.sounds.SoundSource.HOSTILE, 1.1f, 0.7f);
-            PixelfxFx.play(server, this.center.add(0.0, 0.1, 0.0),
-                    PixelfxSlugs.TOHKA_CONVOCATION_CIRCLE, 3.0f, 0.0f);
+                    SoundEvents.BEACON_ACTIVATE,
+                    SoundSource.HOSTILE, 1.1f, 0.7f);
         }
 
-        // 圈外扣血（收尾之后不再扣，交给 finalBurst）
+        // 沿收缩边界生成向圆心牵引的黄金蝶流
+        if (this.age % 6 == 0 && !this.finished) {
+            double baseAngle = this.age * 0.14;
+            for (int i = 0; i < 6; i++) {
+                double a = baseAngle + (Math.PI * 2.0 * i) / 6.0;
+                double px = this.center.x + Math.cos(a) * radius;
+                double pz = this.center.z + Math.sin(a) * radius;
+                server.sendParticles(ModParticles.GOLDEN_BUTTERFLY.get(),
+                        px, this.center.y + 0.45, pz,
+                        0, -Math.cos(a) * 0.08, 0.015, -Math.sin(a) * 0.08, 1.0);
+            }
+        }
+
         if (this.age > WINDUP && this.age % TICK_DAMAGE_INTERVAL == 0 && !this.finished) {
             this.hurtOutside(server, radius);
         }
 
-        // 收到底：炸一发
         if (!this.finished && this.age >= WINDUP + SHRINK) {
             this.finished = true;
             this.finalBurst(server);
         }
     }
 
-    /** 圈外的人扣血；圈内的人安全。 */
     private void hurtOutside(ServerLevel server, double radius) {
         AABB box = new AABB(this.center, this.center).inflate(RADIUS_START + 2.0);
         for (Player player : server.getEntitiesOfClass(Player.class, box)) {
@@ -126,24 +125,31 @@ public class WitchDomainSpell extends Spell {
             player.hurt(this.caster == null
                     ? server.damageSources().magic()
                     : server.damageSources().indirectMagic(this.caster, this.caster), OUTSIDE_DAMAGE);
-            // 圈外的提示：脚下一圈暗紫，读得出「你站在审判范围外」
-            server.sendParticles(ParticleTypes.SOUL_FIRE_FLAME,
-                    player.getX(), player.getY() + 0.2, player.getZ(), 6, 0.3, 0.1, 0.3, 0.01);
+            server.sendParticles(ParticleTypes.WITCH,
+                    player.getX(), player.getY() + 0.3, player.getZ(), 8, 0.35, 0.2, 0.35, 0.02);
         }
     }
 
-    /** 收到底的收尾：中心立牌 + 冲击环 + 圈内满伤害。 */
     private void finalBurst(ServerLevel server) {
-        PixelfxFx.play(server, this.center.add(0.0, 0.5, 0.0),
-                PixelfxSlugs.EPITAPH_AEGIS, 0.5f, 0.0f);
+        PixelfxFx.play(server, this.center.add(0.0, 0.6, 0.0),
+                PixelfxSlugs.EPITAPH_AEGIS, 0.55f, 0.0f);
         PixelfxFx.play(server, this.center.add(0.0, 0.05, 0.0),
-                PixelfxSlugs.TOHKA_BELL_WAVE, 1.6f, 0.0f);
-        server.sendParticles(ParticleTypes.EXPLOSION_EMITTER,
+                PixelfxSlugs.TOHKA_BELL_WAVE, 1.8f, 0.0f);
+
+        server.sendParticles(ModParticles.BURST_STAR.get(),
+                this.center.x, this.center.y + 0.8, this.center.z, 3, 0.25, 0.25, 0.25, 0.0);
+        server.sendParticles(ModParticles.BURST_RING.get(),
                 this.center.x, this.center.y + 0.5, this.center.z, 1, 0.0, 0.0, 0.0, 0.0);
+        server.sendParticles(ModParticles.BURST_BUTTERFLY.get(),
+                this.center.x, this.center.y + 0.4, this.center.z, 12, 0.4, 0.3, 0.4, 0.0);
+
         server.playSound(null, this.center.x, this.center.y, this.center.z,
-                net.minecraft.sounds.SoundEvents.GENERIC_EXPLODE,
-                net.minecraft.sounds.SoundSource.HOSTILE, 1.4f, 0.7f);
-        SpellFx.shake(server, this.center, 32.0, 0.5f, 8);
+                SoundEvents.GENERIC_EXPLODE,
+                SoundSource.HOSTILE, 1.2f, 0.75f);
+        server.playSound(null, this.center.x, this.center.y, this.center.z,
+                SoundEvents.AMETHYST_BLOCK_RESONATE,
+                SoundSource.HOSTILE, 1.4f, 1.1f);
+        SpellFx.shake(server, this.center, 36.0, 0.65f, 10);
 
         AABB box = new AABB(this.center, this.center).inflate(RADIUS_END + 1.5);
         for (Player player : server.getEntitiesOfClass(Player.class, box)) {

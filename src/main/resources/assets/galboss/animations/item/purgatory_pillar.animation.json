@@ -1,0 +1,63 @@
+{
+  "format_version": "1.8.0",
+  "animations": {
+    "animation.purgatory_pillar.spin": {
+      "loop": true,
+      "animation_length": 4.0,
+      "bones": {
+        "gold_spiral": {
+          "rotation": {
+            "0.0": [0, 0, 0],
+            "4.0": [0, 360, 0]
+          }
+        },
+        "silk_tassel": {
+          "rotation": {
+            "0.0": [0, 0, 0],
+            "1.0": [2.5, 0, 1.5],
+            "2.0": [0, 0, 0],
+            "3.0": [-2.5, 0, -1.5],
+            "4.0": [0, 0, 0]
+          }
+        }
+      }
+    },
+    "animation.purgatory_pillar.use": {
+      "loop": false,
+      "animation_length": 0.45,
+      "bones": {
+        "pillar_root": {
+          "position": {
+            "0.0": [0, 0, 0],
+            "0.0833": [0, 2.2, 0],
+            "0.1667": [0, 2.6, 0],
+            "0.25": [0, -0.5, 0],
+            "0.45": [0, 0, 0]
+          }
+        },
+        "gold_spiral": {
+          "rotation": {
+            "0.0": [0, 0, 0],
+            "0.2": [0, 260, 0],
+            "0.45": [0, 360, 0]
+          }
+        },
+        "flared_guard": {
+          "rotation": {
+            "0.0": [0, 0, 0],
+            "0.15": [0, 60, 0],
+            "0.45": [0, 180, 0]
+          }
+        },
+        "silk_tassel": {
+          "rotation": {
+            "0.0": [0, 0, 0],
+            "0.15": [16, 0, 9],
+            "0.32": [-12, 0, -7],
+            "0.45": [0, 0, 0]
+          }
+        }
+      }
+    }
+  }
+}

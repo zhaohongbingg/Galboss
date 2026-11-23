@@ -162,6 +162,11 @@ public final class PixelfxAssets {
             if (defaultScale <= 0.0f) {
                 defaultScale = 0.02f;
             }
+            // billboard 的屏幕平面旋转角；ground 忽略此字段（朝向由调用方 yaw 决定）
+            float roll = GsonHelper.getAsFloat(json, "roll", 0.0f);
+            if (!Float.isFinite(roll)) {
+                roll = 0.0f;
+            }
 
             // 下面三项是「Godot 移植适配」用的可调项，缺省值 = 保持原行为
             int tint = 0xFFFFFF;
@@ -182,7 +187,7 @@ public final class PixelfxAssets {
 
             return Optional.of(new PixelfxMetadata(slug, texture, lightTexture,
                     frameW, frameH, cols, rows, frames, fps, loop, durationTicks,
-                    pivotX, pivotY, billboard, defaultScale,
+                    pivotX, pivotY, billboard, roll, defaultScale,
                     tint, lightStrength, premultiplied));
         } catch (RuntimeException e) {
             // 缺字段 / 类型不对：pixelfx 是「资源没烘好」而不是「游戏坏了」，绝不能把玩家崩掉

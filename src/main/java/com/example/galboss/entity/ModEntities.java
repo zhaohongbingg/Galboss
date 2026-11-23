@@ -87,6 +87,35 @@ public class ModEntities {
                             .clientTrackingRange(64)
                             .build(ResourceLocation.fromNamespaceAndPath(GalBoss.MOD_ID, "fs_pet").toString()));
 
+    // ------------------------------------------------ 炼狱七桩（贝阿朵莉切的七名仆从）
+    //
+    // 七个「精英怪」：同一套骨架与共用基类（AbstractPurgatoryStakeEntity），只有发型/发色不同。
+    // 尺寸 0.7 × 2.0 与贝阿朵莉切一致：交付模型 45.33–45.54 单位（≈2.85 格）在渲染器里乘 0.7
+    // 的 YSM height_scale 收到 ≈1.99 格 —— 渲染缩放与碰撞箱两处必须一起改（见 PurgatoryStakeRenderer）。
+    // 七个的手里都持炼狱之柱（PurgatoryPillarLayer + GeoItem），不自然生成，刷怪蛋 / 命令召唤。
+
+    public static final RegistryObject<EntityType<AsmodeusEntity>> ASMODEUS = stake("asmodeus", AsmodeusEntity::new);
+    public static final RegistryObject<EntityType<BeelzebubEntity>> BEELZEBUB = stake("beelzebub", BeelzebubEntity::new);
+    public static final RegistryObject<EntityType<BelphegorEntity>> BELPHEGOR = stake("belphegor", BelphegorEntity::new);
+    public static final RegistryObject<EntityType<LeviathanEntity>> LEVIATHAN = stake("leviathan", LeviathanEntity::new);
+    public static final RegistryObject<EntityType<LuciferEntity>> LUCIFER = stake("lucifer", LuciferEntity::new);
+    public static final RegistryObject<EntityType<MammonEntity>> MAMMON = stake("mammon", MammonEntity::new);
+    public static final RegistryObject<EntityType<SatanEntity>> SATAN = stake("satan", SatanEntity::new);
+
+    /**
+     * 七桩的注册模板：注册名只写一次，同时用作实体 id、geo/贴图文件名与语言的键。
+     *
+     * <p>如果哪天要给某一位单独改碰撞箱或分类，就把它从这条模板里拆出来单独写。
+     */
+    private static <T extends AbstractPurgatoryStakeEntity> RegistryObject<EntityType<T>> stake(
+            String id, EntityType.EntityFactory<T> factory) {
+        return ENTITY_TYPES.register(id,
+                () -> EntityType.Builder.<T>of(factory, MobCategory.MONSTER)
+                        .sized(0.7f, 2.0f)
+                        .clientTrackingRange(64)
+                        .build(ResourceLocation.fromNamespaceAndPath(GalBoss.MOD_ID, id).toString()));
+    }
+
     /**
      * 贝阿朵莉切的「黄金蝶」远程法术（发射物）。
      *
@@ -137,6 +166,14 @@ public class ModEntities {
             event.put(FS_GUARD.get(), FsGuardEntity.createAttributes().build());
             event.put(BLACK_GOAT_SERVANT.get(), BlackGoatServantEntity.createAttributes().build());
             event.put(FS_PET.get(), FsPetEntity.createAttributes().build());
+            // 炼狱七桩共用同一套精英怪属性（要分化就单独给某一位写 builder）
+            event.put(ASMODEUS.get(), AbstractPurgatoryStakeEntity.createStakeAttributes().build());
+            event.put(BEELZEBUB.get(), AbstractPurgatoryStakeEntity.createStakeAttributes().build());
+            event.put(BELPHEGOR.get(), AbstractPurgatoryStakeEntity.createStakeAttributes().build());
+            event.put(LEVIATHAN.get(), AbstractPurgatoryStakeEntity.createStakeAttributes().build());
+            event.put(LUCIFER.get(), AbstractPurgatoryStakeEntity.createStakeAttributes().build());
+            event.put(MAMMON.get(), AbstractPurgatoryStakeEntity.createStakeAttributes().build());
+            event.put(SATAN.get(), AbstractPurgatoryStakeEntity.createStakeAttributes().build());
         }
     }
 }

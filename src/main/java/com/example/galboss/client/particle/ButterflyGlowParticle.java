@@ -5,31 +5,50 @@ import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.client.particle.ParticleRenderType;
 import net.minecraft.core.particles.SimpleParticleType;
+import net.minecraft.util.Mth;
+
+import javax.annotation.Nullable;
 
 /**
  * 蝴蝶 · 辉光层（加色混合）。
  *
- * <p>加色混合（{@code SRC_ALPHA, ONE}）下，亮部会「烧」出光晕、透明处 alpha=0 完全不贡献颜色，
- * 于是镂空依旧透出背景。图集是同布局的发光版（{@link Butterflies#ORANGE_GLOW}）。
- *
- * <p>与本体<b>同帧</b>：本体创建这只时把自己的相位传进来，辉光用同一相位取帧，
- * 两层轮廓严格重合（否则光斑会糊在别处）。
+ * <p>挂载在 {@link ButterflyParticle} 上时，每帧严格镜像本体的位置、拍翅帧与生命周期，
+ * 消除随机运动漂移，并随翅膀开合相位做呼吸式光晕脉动。
  */
 public class ButterflyGlowParticle extends AbstractButterflyParticle {
 
-    /** 辉光用的图集。 */
     private static final ButterflySprite SPRITE = Butterflies.ORANGE_GLOW;
 
-    /** 辉光渲染类型：辉光图集 + 全亮 + 加色混合。 */
     public static final ParticleRenderType RENDER_TYPE = createRenderType(SPRITE.texture(), true);
 
+    @Nullable
+    private final ButterflyParticle parent;
+
+    /** 由本体创建：严格锁定父级位置、帧序号与淡入淡出。 */
+    ButterflyGlowParticle(ButterflyParticle parent) {
+        super(parent.clientLevel(),
+                parent.currentX(), parent.currentY(), parent.currentZ(),
+                0.0, 0.0, 0.0,
+                parent.phaseOffset, SPRITE);
+        this.parent = parent;
+        this.lifetime = parent.lifeTicks();
+        // 暖白金高光色调：加色叠加时中心偏白金、边缘保持琥珀金
+        this.rCol = 1.0F;
+        this.gCol = 0.90F;
+        this.bCol = 0.62F;
+        syncWithParent();
+    }
+
+    /** 独立生成构造器（兼容直接通过 ParticleType 调用）。 */
     protected ButterflyGlowParticle(ClientLevel level, double x, double y, double z,
                                     double vx, double vy, double vz, int phaseOffset) {
         super(level, x, y, z, vx, vy, vz, phaseOffset, SPRITE);
-        // 辉光比本体略大一圈（bloom 感），但别大到糊掉轮廓
-        this.quadSize *= 1.22F;
-        // 辉光整体弱一些，避免加色叠爆
-        this.alpha = 0.5F;
+        this.parent = null;
+        this.quadSize *= 1.25F;
+        this.rCol = 1.0F;
+        this.gCol = 0.90F;
+        this.bCol = 0.62F;
+        this.alpha = 0.0F;
     }
 
     @Override
@@ -39,12 +58,44 @@ public class ButterflyGlowParticle extends AbstractButterflyParticle {
 
     @Override
     public void tick() {
+        if (this.parent != null) {
+            if (!this.parent.isAlive()) {
+                this.remove();
+                return;
+            }
+            this.age = this.parent.currentAge();
+            syncWithParent();
+            return;
+        }
+
+        // 独立模式回退逻辑
         super.tick();
-        // 淡入淡出由本体控制节奏，这里保持一个略低的固定亮度（加色下太亮会糊）
-        this.alpha = 0.5F;
+        float pulse = 0.48F + 0.18F * Mth.sin(this.age * 0.95F + this.phaseOffset);
+        this.alpha *= pulse;
     }
 
-    /** 注册到 {@code RegisterParticleProvidersEvent} 的工厂。 */
+    private void syncWithParent() {
+        if (this.parent == null) {
+            return;
+        }
+        this.xo = this.parent.prevX();
+        this.yo = this.parent.prevY();
+        this.zo = this.parent.prevZ();
+        this.setPos(this.parent.currentX(), this.parent.currentY(), this.parent.currentZ());
+
+        float flapWave = Mth.sin((this.age / (float) Math.max(1, SPRITE.frameTicks()) + this.phaseOffset) * (float) Math.PI);
+        this.quadSize = this.parent.currentQuadSize() * (1.25F + 0.07F * flapWave);
+        this.alpha = this.parent.currentAlpha() * (0.48F + 0.18F * flapWave);
+    }
+
+    @Override
+    protected int frameIndex() {
+        if (this.parent != null) {
+            return Math.floorMod(this.parent.currentFrameIndex(), SPRITE.frames());
+        }
+        return super.frameIndex();
+    }
+
     public static class Provider implements ParticleProvider<SimpleParticleType> {
         @Override
         public Particle createParticle(SimpleParticleType type, ClientLevel level,

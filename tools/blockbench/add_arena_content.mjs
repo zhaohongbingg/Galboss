@@ -9,7 +9,8 @@ import { W } from './nbt_write.mjs';
 //
 // 用法：node add_arena_content.mjs <chess_arena.nbt>
 //
-// 与 arena_struct.mcfunction 对应：模板 66x20x66，局部 y=6 是棋盘地板层，y=7..9 围墙，中心 (32.5, 7.0, 32.5)。
+// 与 arena_struct.mcfunction 对应：模板 66x14x66（rework_arena.mjs 之后的下沉版），
+// 局部 y=0 是棋盘地板层，y=1 石沿，y=2..4 围墙，中心 (32.5, 1.0, 32.5)。
 
 const nbtFile = process.argv[2];
 if (!nbtFile) {
@@ -17,7 +18,7 @@ if (!nbtFile) {
   process.exit(1);
 }
 
-const FLOOR_TOP = 7;      // 地板顶面（实体脚部高度，局部坐标）
+const FLOOR_TOP = 1;      // 地板顶面（实体脚部高度，局部坐标）
 const HEADROOM = 12;      // 地板以上清空层数
 const BOSS_ID = 'galboss:beatrice';
 

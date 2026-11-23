@@ -1,0 +1,15 @@
+{
+  "structures": [
+    {
+      "structure": "galboss:school_building",
+      "weight": 1
+    }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "salt": 20251202,
+    "spacing": 40,
+    "separation": 20,
+    "spread_type": "linear"
+  }
+}

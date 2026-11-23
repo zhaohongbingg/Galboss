@@ -13,13 +13,14 @@ import com.example.galboss.client.particle.BloodParticle;
 import com.example.galboss.client.particle.GoldenDotParticle;
 import com.example.galboss.client.particle.GoldenRingParticle;
 import com.example.galboss.client.particle.GoldenStarParticle;
-import com.example.galboss.client.renderer.BeatriceRenderer;
-import com.example.galboss.client.renderer.BlackGoatServantRenderer;
+import com.example.galboss.client.renderer.BeatriceRenderer;import com.example.galboss.client.renderer.BlackGoatServantRenderer;
 import com.example.galboss.client.renderer.FsGuardRenderer;
 import com.example.galboss.client.renderer.FsPetRenderer;
 import com.example.galboss.client.renderer.OnabutaIkukoRenderer;
+import com.example.galboss.client.renderer.PurgatoryStakeRenderer;
 import com.example.galboss.client.renderer.ReizenTohkaRenderer;
 import com.example.galboss.client.renderer.TadasugawaReiRenderer;
+import com.example.galboss.client.sound.GalBossMusicController;
 import com.example.galboss.entity.ModEntities;
 import com.example.galboss.particle.ModParticles;
 import net.minecraftforge.api.distmarker.Dist;
@@ -45,6 +46,14 @@ public class ClientSetup {
         event.registerEntityRenderer(ModEntities.FS_GUARD.get(), FsGuardRenderer::new);
         event.registerEntityRenderer(ModEntities.BLACK_GOAT_SERVANT.get(), BlackGoatServantRenderer::new);
         event.registerEntityRenderer(ModEntities.FS_PET.get(), FsPetRenderer::new);
+        // 炼狱七桩：七人共用同一个渲染器（资源路径由 assetId() 决定），都挂炼狱之柱手持层
+        event.registerEntityRenderer(ModEntities.ASMODEUS.get(), PurgatoryStakeRenderer::new);
+        event.registerEntityRenderer(ModEntities.BEELZEBUB.get(), PurgatoryStakeRenderer::new);
+        event.registerEntityRenderer(ModEntities.BELPHEGOR.get(), PurgatoryStakeRenderer::new);
+        event.registerEntityRenderer(ModEntities.LEVIATHAN.get(), PurgatoryStakeRenderer::new);
+        event.registerEntityRenderer(ModEntities.LUCIFER.get(), PurgatoryStakeRenderer::new);
+        event.registerEntityRenderer(ModEntities.MAMMON.get(), PurgatoryStakeRenderer::new);
+        event.registerEntityRenderer(ModEntities.SATAN.get(), PurgatoryStakeRenderer::new);
         // 黄金蝶：本体不画任何东西，外观完全由粒子构成（见 ButterflyMissileEntity）
         event.registerEntityRenderer(ModEntities.BUTTERFLY_MISSILE.get(), NoopRenderer::new);
         // 狙击光箭：同上，外观 = 金色拖尾 + 命中溅血
@@ -68,6 +77,10 @@ public class ClientSetup {
         MinecraftForge.EVENT_BUS.addListener(SniperLockOverlay::onRenderGui);
         // 屏震：改相机角度（落雷 / 锤击 / 巨物坠地）
         MinecraftForge.EVENT_BUS.addListener(ScreenShake::onCamera);
+        // BGM：进入黄金乡放主题曲，开战后换成战斗曲；同时把原版背景乐挡掉
+        // （判定与播放全在客户端，服务端不发包，见 GalBossMusicController）
+        MinecraftForge.EVENT_BUS.addListener(GalBossMusicController::onClientTick);
+        MinecraftForge.EVENT_BUS.addListener(GalBossMusicController::onPlaySound);
     }
 
     /**

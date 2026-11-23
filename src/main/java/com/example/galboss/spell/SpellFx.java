@@ -61,10 +61,14 @@ public final class SpellFx {
 
     /** 地面圆（预警 / 冲击环）。 */
     public static void circle(Level level, Vec3 center, double radius, DustParticleOptions dust) {
+        circle(level, center, radius, dust, MAX_POINTS);
+    }
+
+    static void circle(Level level, Vec3 center, double radius, DustParticleOptions dust, int pointLimit) {
         if (!(level instanceof ServerLevel server) || radius <= 0.05) {
             return;
         }
-        int points = Math.min(MAX_POINTS, Math.max(12, (int) Math.round(radius * 8)));
+        int points = Math.min(pointLimit, Math.max(12, (int) Math.round(radius * 8)));
         for (int i = 0; i < points; i++) {
             double angle = Math.PI * 2.0 * i / points;
             server.sendParticles(dust,

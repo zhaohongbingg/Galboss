@@ -4,6 +4,9 @@ import com.example.galboss.GalBoss;
 import com.example.galboss.config.GalBossConfig;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -94,6 +97,19 @@ public abstract class AbstractFSBossEntity extends Monster implements GeoEntity 
 
     protected ServerBossEvent bossEvent;
 
+    /**
+     * 客户端可见的「这场遭遇已经开打」标记。
+     *
+     * <p>{@link #battleActive} 只是服务端状态，客户端看不到；而客户端的 BGM 需要区分
+     * 「结构里待机、右键才挑战的 boss」和「已经开打的 boss」—— 不然玩家在走廊里路过就会
+     * 开始放战斗曲。所以单独开一个同步字段，只在 {@link #startBattle()} 里置 true。
+     *
+     * <p>开战是单向的（没有「停战」），所以不需要回收；读档时按存档里的值补一次，
+     * 避免战斗中退出重进后客户端以为没开打。
+     */
+    private static final EntityDataAccessor<Boolean> DATA_BATTLE_MUSIC = SynchedEntityData.defineId(
+            AbstractFSBossEntity.class, EntityDataSerializers.BOOLEAN);
+
     /** 空手/默认状态，子类覆写以提供自己的冷却基准。 */
     protected boolean battleActive = false;
     private boolean dialogueStarted = false;
@@ -137,6 +153,22 @@ public abstract class AbstractFSBossEntity extends Monster implements GeoEntity 
         this.setMaxUpStep(1.0f);
         // boss 不参与「离玩家太远就消失」的判定，否则打到一半飞出 128 格就会把整个遭遇抹掉
         this.setPersistenceRequired();
+    }
+
+    @Override
+    protected void defineSynchedData() {
+        super.defineSynchedData();
+        this.entityData.define(DATA_BATTLE_MUSIC, false);
+    }
+
+    /**
+     * 战斗是否已经开打（服务端读本地状态，客户端读同步字段）。
+     *
+     * <p>给客户端 BGM 判定用的公共入口：{@link #isBattleActive()} 是 {@code protected}，
+     * 客户端包里的音乐控制器调不到，也不该为了它把内部状态整片公开。
+     */
+    public boolean isBattleMusicActive() {
+        return this.level().isClientSide ? this.entityData.get(DATA_BATTLE_MUSIC) : this.battleActive;
     }
 
     /**
@@ -349,6 +381,8 @@ public abstract class AbstractFSBossEntity extends Monster implements GeoEntity 
         }
         this.battleActive = true;
         this.dialogueStarted = true;
+        // 同步给客户端：战斗曲从这里开始（客户端 BGM 控制器只看这个字段）
+        this.entityData.set(DATA_BATTLE_MUSIC, true);
         // 已经开战了，头顶那句「右键挑战」该撤掉，只留角色名（它同时是血条上显示的名字）
         this.refreshChallengeName();
         this.participants = countParticipants();
@@ -444,6 +478,8 @@ public abstract class AbstractFSBossEntity extends Monster implements GeoEntity 
         super.readAdditionalSaveData(tag);
 
         this.battleActive = tag.getBoolean(TAG_BATTLE_ACTIVE);
+        // 读档后把同步字段补上，否则战斗中退出重进时客户端会以为还没开打（战斗曲不响）
+        this.entityData.set(DATA_BATTLE_MUSIC, this.battleActive);
         // 战斗中读档时即便标记缺失也要认作「已经讲过话了」，不然会重播一遍开场对白
         this.dialogueStarted = tag.getBoolean(TAG_DIALOGUE_STARTED) || this.battleActive;
         this.participants = Math.max(1, tag.getInt(TAG_PARTICIPANTS));

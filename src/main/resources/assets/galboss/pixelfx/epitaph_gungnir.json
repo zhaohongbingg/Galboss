@@ -16,6 +16,7 @@
   "y": 26
  },
  "anchor": "billboard",
+ "roll": -90,
  "defaultScale": 0.035,
  "palette": [
   "#241703",
@@ -33,7 +34,5 @@
   "effect": "holy/divine-lance",
   "seed": 25,
   "adaptedFrom": "Hugo Duprez / Sprite Fusion (MIT), Hollow Crown (MIT)，见 NOTICE.md"
- },
- "tint": "#ecc780",
- "lightStrength": 2.4
+ }
 }

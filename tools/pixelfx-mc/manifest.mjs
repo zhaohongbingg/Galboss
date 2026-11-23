@@ -185,6 +185,10 @@ export const EFFECTS = [
     palette: PALETTES.tohkaGold,
     seed: 25,
     anchor: "billboard",
+    // 素材里枪尖朝右、枪身向左延伸；billboard 的 yaw 会被相机覆盖，
+    // 所以用 roll 在屏幕平面内旋转：-90°（顺时针）= 枪尖朝下，读作「自天上贯地突刺」。
+    // 注：+90 会让枪尖朝上（从地下往上突），实机已确认过方向。
+    roll: -90,
     defaultScale: 0.035,
     note: "神话·永恒之枪 Gungnir。",
   },
@@ -205,5 +209,16 @@ export const EFFECTS = [
     anchor: "billboard",
     defaultScale: 0.04,
     note: "神话·雅典娜之盾 Aegis。",
+  },
+  {
+    slug: "tohka_soul_chain",
+    pixelfxId: "shadow/soul-chain",
+    palette: PALETTES.tohkaViolet,
+    seed: 5,
+    // 这条索会被沿两点连线横向拉伸使用（pivot 在左端，见 origin），
+    // 所以它是 link 锚点而不是普通 billboard。
+    anchor: "billboard",
+    defaultScale: 0.02,
+    note: "魂链·两目标之间的魂之索（横向拉伸使用）。",
   },
 ];

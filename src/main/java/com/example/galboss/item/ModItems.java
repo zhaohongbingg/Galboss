@@ -85,6 +85,47 @@ public class ModItems {
             )
     );
 
+    // --------------------------------------- 炼狱七桩（贝阿朵莉切的七名仆从）的刷怪蛋
+    //
+    // 配色规则沿用上面的做法：主色 = 头发（七人最醒目的区别，衣服是同一套酒红制服），
+    // 副色 = 制服酒红。发色不是眼估的，是 tools/blockbench/import_purgatory_stakes.mjs
+    // 转换后按「与其它六人不同的像素」的主色统计出来的（七人贴图只差头发区域）。
+
+    /** 阿斯莫德：金色高马尾（#c09050）。 */
+    public static final RegistryObject<Item> ASMODEUS_SPAWN_EGG = ITEMS.register(
+            "asmodeus_spawn_egg",
+            () -> new ForgeSpawnEggItem(ModEntities.ASMODEUS::get, 0xC09050, 0x7A2B3C, new Item.Properties()));
+
+    /** 别西卜：深金波浪长发（#b08030）。 */
+    public static final RegistryObject<Item> BEELZEBUB_SPAWN_EGG = ITEMS.register(
+            "beelzebub_spawn_egg",
+            () -> new ForgeSpawnEggItem(ModEntities.BEELZEBUB::get, 0xB08030, 0x7A2B3C, new Item.Properties()));
+
+    /** 贝尔芬格：深蓝黑双马尾（#303040）。 */
+    public static final RegistryObject<Item> BELPHEGOR_SPAWN_EGG = ITEMS.register(
+            "belphegor_spawn_egg",
+            () -> new ForgeSpawnEggItem(ModEntities.BELPHEGOR::get, 0x303040, 0x7A2B3C, new Item.Properties()));
+
+    /** 利维坦：薄荷绿双马尾（#80a080）。 */
+    public static final RegistryObject<Item> LEVIATHAN_SPAWN_EGG = ITEMS.register(
+            "leviathan_spawn_egg",
+            () -> new ForgeSpawnEggItem(ModEntities.LEVIATHAN::get, 0x80A080, 0x7A2B3C, new Item.Properties()));
+
+    /** 路西法：黑色长直发（#202030，暂定发型）。 */
+    public static final RegistryObject<Item> LUCIFER_SPAWN_EGG = ITEMS.register(
+            "lucifer_spawn_egg",
+            () -> new ForgeSpawnEggItem(ModEntities.LUCIFER::get, 0x202030, 0x7A2B3C, new Item.Properties()));
+
+    /** 玛门：铜棕马尾（#705030）。 */
+    public static final RegistryObject<Item> MAMMON_SPAWN_EGG = ITEMS.register(
+            "mammon_spawn_egg",
+            () -> new ForgeSpawnEggItem(ModEntities.MAMMON::get, 0x705030, 0x7A2B3C, new Item.Properties()));
+
+    /** 撒旦：银白卷钻发（#c8c8d0）。 */
+    public static final RegistryObject<Item> SATAN_SPAWN_EGG = ITEMS.register(
+            "satan_spawn_egg",
+            () -> new ForgeSpawnEggItem(ModEntities.SATAN::get, 0xC8C8D0, 0x7A2B3C, new Item.Properties()));
+
     // ------------------------------------------------- 手持武器（用于渲染层）
     //
     // 这两个既是模型载体也是实际物品：怪物手持武器走原版物品系统
@@ -113,6 +154,19 @@ public class ModItems {
     public static final RegistryObject<Item> BEATRICE_PIPE = ITEMS.register(
             "beatrice_pipe",
             () -> new Item(new Item.Properties())
+    );
+
+    /**
+     * 炼狱之柱：七位炼狱之桩手里那根柱子，同时也是能拿在手里的实际物品。
+     *
+     * <p>和烟斗 / 武士刀 / 手枪同为「手持物」，但实现不同：柱子有 819/968 个自由角度旋转的方块，
+     * 原版物品模型只接受 0 / ±22.5 / ±45，走 elements 会被削平甚至整份不加载 ——
+     * 所以它是 GeckoLib 的 GeoItem（见 {@code PurgatoryPillarItem}），物品模型是
+     * {@code models/item/purgatory_pillar.json}（{@code builtin/entity}）+ {@code geo/item/purgatory_pillar.geo.json}。
+     */
+    public static final RegistryObject<Item> PURGATORY_PILLAR = ITEMS.register(
+            "purgatory_pillar",
+            () -> new PurgatoryPillarItem(new Item.Properties().stacksTo(1))
     );
 
     // -------------------------------------- 棋盘竞技场的不可破坏方块（BlockItem）

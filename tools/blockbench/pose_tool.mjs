@@ -125,7 +125,7 @@ const aroundPivot = (pivot, rot) => mul(mul(T(pivot), rot), T(pivot.map((v) => -
 // ---------------------------------------------------------------- 参数
 const args = process.argv.slice(2);
 const geoPath = args[0];
-const opt = { anim: null, name: null, t: 0, pose: null, render: null, views: ['front', 'side', 'three'], clip: null, size: 800, texture: null, show: null, item: null, anchor: null, itemTexture: null };
+const opt = { anim: null, name: null, t: 0, pose: null, render: null, views: ['front', 'side', 'three'], clip: null, size: 800, texture: null, show: null, item: null, itemGeo: null, anchor: null, itemTexture: null };
 for (let i = 1; i < args.length; i++) {
   const a = args[i];
   if (a === '--anim') opt.anim = args[++i];
@@ -140,6 +140,7 @@ for (let i = 1; i < args.length; i++) {
   else if (a === '--texture') opt.texture = args[++i];
   else if (a === '--show') opt.show = args[++i].split(',');
   else if (a === '--item') opt.item = args[++i];
+  else if (a === '--item-geo') opt.itemGeo = args[++i];
   else if (a === '--anchor') opt.anchor = args[++i];
   else if (a === '--item-texture') opt.itemTexture = args[++i];
   else if (a === '--item-disp-file') opt.itemDisp = JSON.parse(readFileSync(args[++i], 'utf8'));
@@ -168,19 +169,35 @@ function evalMolang(expr, animTime) {
     animTime
   );
 }
+/** 一个关键帧值 → [x,y,z]。
+ *  能吃的三种写法：
+ *    - 数字            （`"scale": 1`，YSM 常用；按均匀缩放展开成 [v,v,v]）
+ *    - 三元数组        （`[x,y,z]`）
+ *    - {pre, post}     （Bedrock / YSM 的关键帧写法；线性插值取 post，只有 pre 时取 pre）
+ *  缺字段一律给 [0,0,0]，宁可画歪一个通道也不让整个预览崩掉。 */
+function frameVec(node, t) {
+  let v = node;
+  if (v && typeof v === 'object' && !Array.isArray(v)) {
+    v = v.post !== undefined ? v.post : (v.pre !== undefined ? v.pre : v.vector);
+  }
+  if (typeof v === 'number') return [v, v, v];
+  if (!Array.isArray(v)) return [0, 0, 0];
+  return v.map((x) => evalMolang(x, t));
+}
+
 /** 取通道在 t 时刻的 [x,y,z]；常量通道直接给值，关键帧通道线性插值。
  *  注意：JSON 里的时间键是字符串（"0.0"/"0.5"/"1.0"），排序要用 Number 比较，
  *  但回查 channel 必须用**原始字符串键**，否则 String(Number(key)) 与键格式不一致会取到 undefined。 */
 function sampleChannel(channel, t) {
   if (!channel) return null;
-  if (Array.isArray(channel)) return channel.map((v) => evalMolang(v, t));
+  if (typeof channel === 'number' || Array.isArray(channel)) return frameVec(channel, t);
   if (channel.vector) {
-    if (Object.keys(channel).length === 1) return channel.vector.map((v) => evalMolang(v, t));
+    if (Object.keys(channel).length === 1) return frameVec(channel.vector, t);
   }
   const keyStrs = Object.keys(channel).filter((k) => k !== 'vector').sort((a, b) => Number(a) - Number(b));
   const times = keyStrs.map(Number);
-  if (!times.length) return channel.vector ? channel.vector.map((v) => evalMolang(v, t)) : null;
-  const vecAt = (k) => (channel[k].vector ?? channel[k]).map((v) => evalMolang(v, t));
+  if (!times.length) return channel.vector ? frameVec(channel.vector, t) : null;
+  const vecAt = (k) => frameVec(channel[k], t);
   if (t <= times[0]) return vecAt(keyStrs[0]);
   if (t >= times[times.length - 1]) return vecAt(keyStrs[keyStrs.length - 1]);
   let i = 0;
@@ -480,6 +497,96 @@ if (opt.item) {
   const len = Math.hypot(...dir) || 1;
   console.log(`\n烟斗朝向: 斗端相对手部方向 = [${dir.map((v) => (v / len).toFixed(2)).join(', ')}]（+Y 上 / -Z 前；游戏里约为其反向）`);
   console.log(`  bowl 世界坐标 ≈ [${bowl.map((v) => v.toFixed(1)).join(', ')}]，握手点 ≈ [${grip.map((v) => v.toFixed(1)).join(', ')}]`);
+}
+
+// ---------------------------------------------------------------- 挂载 GeoItem（炼狱之柱）
+// 柱子是 GeckoLib 的 GeoItem：几何在 geo/item/*.geo.json，不是原版 elements，
+// 所以走不了上面 --item 那条路（那条只读 models/item/*.json 的 elements）。
+//
+// 变换对齐 GeoItemRenderer 的真实渲染栈：
+//   ItemRenderer    : display 变换 → translate(-0.5,-0.5,-0.5)
+//   GeoItemRenderer : preRender 里 translate(+0.5,+0.51,+0.5)
+// 净效果 = 骨骼枢轴 + display 变换（残余 +0.01 格忽略）。
+// 另外 geo 的原点就是握柄中心（交付约定），所以这里的「模型中心」是 (0,0,0)，不是原版物品的 (8,8,8)。
+// 复用上面 --item 路径的 itemFaces 数组（渲染阶段统一按 color 上色，无需区分来源）。
+if (opt.itemGeo) {
+  const ig = JSON.parse(readFileSync(opt.itemGeo, 'utf8'))['minecraft:geometry'][0];
+  const anchorName = opt.anchor ?? 'RightHandLocator';
+  const anchorBone = byName.get(anchorName);
+  if (!anchorBone) {
+    console.error(`锚点骨骼不存在: ${anchorName}`);
+    process.exit(1);
+  }
+  if (!opt.itemTexture) {
+    console.error('--item-geo 需要 --item-texture <png>');
+    process.exit(1);
+  }
+  const disp = opt.itemDisp ?? { rotation: [0, 0, 0], translation: [0, 0, 0], scale: [1, 1, 1] };
+  const DR = R(disp.rotation ?? [0, 0, 0]);
+  const DS = disp.scale ?? [1, 1, 1];
+  const DT = disp.translation ?? [0, 0, 0];
+  const bp = anchorBone.pivot ?? [0, 0, 0];
+  const boneM = resolve(anchorBone);
+  const itemToBoneGeo = (v) => {
+    const scaled = [v[0] * DS[0], v[1] * DS[1], v[2] * DS[2]];
+    const rotated = apply(DR, scaled);
+    return [bp[0] + rotated[0] + DT[0], bp[1] + rotated[1] + DT[1], bp[2] + rotated[2] + DT[2]];
+  };
+  const gTex = decodePng(readFileSync(opt.itemTexture));
+  const gW = ig.description.texture_width;
+  const gH = ig.description.texture_height;
+  const gTexel = (u, v) => {
+    const x = Math.min(gTex.width - 1, Math.max(0, Math.floor((u / gW) * gTex.width)));
+    const y = Math.min(gTex.height - 1, Math.max(0, Math.floor((v / gH) * gTex.height)));
+    const i = (y * gTex.width + x) * gTex.channels;
+    const c = gTex.channels;
+    const al = c === 4 ? gTex.pixels[i + 3] : 255;
+    return c >= 3 ? [gTex.pixels[i], gTex.pixels[i + 1], gTex.pixels[i + 2], al]
+      : [gTex.pixels[i], gTex.pixels[i], gTex.pixels[i], al];
+  };
+  const gFaceColor = (uv) => {
+    const [u0, v0] = uv.uv;
+    const [du, dv] = uv.uv_size;
+    const ua = Math.min(u0, u0 + du), ub = Math.max(u0, u0 + du);
+    const va = Math.min(v0, v0 + dv), vb = Math.max(v0, v0 + dv);
+    let r = 0, g = 0, b = 0, a = 0, n = 0;
+    for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) {
+      const c = gTexel(ua + ((ub - ua) * (i + 0.5)) / 5, va + ((vb - va) * (j + 0.5)) / 5);
+      r += c[0] * c[3]; g += c[1] * c[3]; b += c[2] * c[3]; a += c[3]; n++;
+    }
+    if (a / n <= 1) return null;
+    return [Math.round(r / a), Math.round(g / a), Math.round(b / a)];
+  };
+  const G_FACE_DEFS = {
+    north: (o, s) => [[o[0] + s[0], o[1], o[2]], [o[0], o[1], o[2]], [o[0], o[1] + s[1], o[2]], [o[0] + s[0], o[1] + s[1], o[2]]],
+    south: (o, s) => [[o[0], o[1], o[2] + s[2]], [o[0] + s[0], o[1], o[2] + s[2]], [o[0] + s[0], o[1] + s[1], o[2] + s[2]], [o[0], o[1] + s[1], o[2] + s[2]]],
+    west: (o, s) => [[o[0], o[1], o[2] + s[2]], [o[0], o[1], o[2]], [o[0], o[1] + s[1], o[2]], [o[0], o[1] + s[1], o[2] + s[2]]],
+    east: (o, s) => [[o[0] + s[0], o[1], o[2]], [o[0] + s[0], o[1], o[2] + s[2]], [o[0] + s[0], o[1] + s[1], o[2] + s[2]], [o[0] + s[0], o[1] + s[1], o[2]]],
+    up: (o, s) => [[o[0], o[1] + s[1], o[2] + s[2]], [o[0] + s[0], o[1] + s[1], o[2] + s[2]], [o[0] + s[0], o[1] + s[1], o[2]], [o[0], o[1] + s[1], o[2]]],
+    down: (o, s) => [[o[0], o[1], o[2]], [o[0] + s[0], o[1], o[2]], [o[0] + s[0], o[1], o[2] + s[2]], [o[0], o[1], o[2] + s[2]]]
+  };
+  let added = 0;
+  let skippedBoneRot = 0;
+  for (const bone of ig.bones) {
+    if (bone.rotation && bone.rotation.some((v) => v !== 0)) skippedBoneRot++;
+    for (const cube of bone.cubes ?? []) {
+      // pose_tool 全程用 geo 空间的镜像旋转（见主立方体循环的注释）
+      const cm = cube.rotation
+        ? aroundPivot(cube.pivot ?? [0, 0, 0], R([-cube.rotation[0], cube.rotation[1], -cube.rotation[2]]))
+        : null;
+      for (const [name, fn] of Object.entries(G_FACE_DEFS)) {
+        const uv = cube.uv?.[name];
+        if (!uv) continue;
+        const color = gFaceColor(uv);
+        if (!color) continue;
+        const pts = fn(cube.origin, cube.size).map((p) => apply(boneM, itemToBoneGeo(cm ? apply(cm, p) : p)));
+        itemFaces.push({ pts, color });
+        added++;
+      }
+    }
+  }
+  console.log(`\n挂载 GeoItem: ${added} 个面（锚点 ${anchorName}，geo ${ig.bones.length} 骨）`);
+  if (skippedBoneRot) console.log(`  ⚠ ${skippedBoneRot} 个骨骼带旋转，预览未处理（柱子应为 0）`);
 }
 
 // ---------------------------------------------------------------- 渲染

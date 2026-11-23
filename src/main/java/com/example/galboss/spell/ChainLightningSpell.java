@@ -106,7 +106,7 @@ public class ChainLightningSpell extends Spell {
                 : this.chain.get(hop - 1).position().add(0.0, 1.0, 0.0);
         Vec3 to = target.position().add(0.0, 1.0, 0.0);
 
-        this.sparkLine(from, to);
+        this.sparkLine(this.level, from, to);
         com.example.galboss.fx.PixelfxFx.play(this.level, to,
                 com.example.galboss.fx.PixelfxSlugs.REI_BULLET_IMPACT, 0.8f, 0.0f);
         if (this.level instanceof ServerLevel server) {
@@ -117,9 +117,9 @@ public class ChainLightningSpell extends Spell {
                 this.caster, this.hit, 10, 1, 0.0);
     }
 
-    /** 两个节点之间的电光：沿直线每 0.4 格一颗，带一点横向抖动。 */
-    private void sparkLine(Vec3 from, Vec3 to) {
-        if (!(this.level instanceof ServerLevel server)) {
+    /** 两个节点之间的电光：沿直线每 0.4 格一颗，带一点横向抖动。包级共享给魂链复用。 */
+    static void sparkLine(Level level, Vec3 from, Vec3 to) {
+        if (!(level instanceof ServerLevel server)) {
             return;
         }
         Vec3 delta = to.subtract(from);
@@ -128,9 +128,9 @@ public class ChainLightningSpell extends Spell {
             Vec3 at = from.add(delta.scale(i / (double) steps));
             double jitter = 0.12;
             server.sendParticles(ParticleTypes.ELECTRIC_SPARK,
-                    at.x + (this.level.random.nextDouble() - 0.5) * jitter,
-                    at.y + (this.level.random.nextDouble() - 0.5) * jitter,
-                    at.z + (this.level.random.nextDouble() - 0.5) * jitter,
+                    at.x + (level.random.nextDouble() - 0.5) * jitter,
+                    at.y + (level.random.nextDouble() - 0.5) * jitter,
+                    at.z + (level.random.nextDouble() - 0.5) * jitter,
                     1, 0.0, 0.0, 0.0, 0.0);
         }
     }

@@ -1,0 +1,40 @@
+{
+ "slug": "tohka_soul_chain",
+ "pixelfxId": "shadow/soul-chain",
+ "texture": "galboss:textures/fx/tohka_soul_chain",
+ "lightTexture": "galboss:textures/fx/tohka_soul_chain_light",
+ "frameW": 238,
+ "frameH": 32,
+ "cols": 8,
+ "rows": 3,
+ "frames": 20,
+ "fps": 20,
+ "loop": true,
+ "durationTicks": 20,
+ "pivot": {
+  "x": 7,
+  "y": 16
+ },
+ "anchor": "billboard",
+ "roll": 0,
+ "defaultScale": 0.02,
+ "palette": [
+  "#120a1e",
+  "#241238",
+  "#3f1f5e",
+  "#5c2f86",
+  "#7d49b0",
+  "#a471d8",
+  "#d3aef5",
+  "#f4e6ff"
+ ],
+ "source": {
+  "repo": "https://github.com/patch-gg/pixelfx",
+  "license": "MIT",
+  "effect": "shadow/soul-chain",
+  "seed": 5,
+  "adaptedFrom": "Hugo Duprez / Sprite Fusion (MIT), Hollow Crown (MIT)，见 NOTICE.md"
+ },
+ "tint": "#b192d0",
+ "lightStrength": 2.0
+}

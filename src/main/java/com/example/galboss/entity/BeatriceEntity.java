@@ -1,6 +1,9 @@
 package com.example.galboss.entity;
 
 import com.example.galboss.boss.BossTelegraph;
+import com.example.galboss.fx.GoldenButterflyBurst;
+import com.example.galboss.fx.PixelfxFx;
+import com.example.galboss.fx.PixelfxSlugs;
 import com.example.galboss.item.ModItems;
 import com.example.galboss.network.ModNetwork;
 import com.example.galboss.network.S2CSniperLockPacket;
@@ -8,10 +11,13 @@ import com.example.galboss.particle.ModParticles;
 import com.example.galboss.ritual.BodySeal;
 import com.example.galboss.ritual.GoldenLand;
 import com.example.galboss.ritual.SacrificeLedger;
+import com.example.galboss.spell.ChessboardFieldSpell;
 import com.example.galboss.spell.ChessboardJudgementSpell;
 import com.example.galboss.spell.GoldenRainSpell;
+import com.example.galboss.spell.SpellFx;
 import com.example.galboss.spell.WitchDomainSpell;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -23,6 +29,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.DamageTypeTags;
+import net.minecraft.util.Mth;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -54,77 +62,51 @@ import net.minecraft.world.phys.Vec3;
 import software.bernie.geckolib.animatable.GeoEntity;
 import software.bernie.geckolib.core.animatable.GeoAnimatable;
 import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
+import software.bernie.geckolib.core.animation.AnimatableManager;
 import software.bernie.geckolib.core.animation.Animation;
 import software.bernie.geckolib.core.animation.AnimationController;
 import software.bernie.geckolib.core.animation.AnimationState;
-import software.bernie.geckolib.core.animation.AnimatableManager;
 import software.bernie.geckolib.core.animation.RawAnimation;
 import software.bernie.geckolib.core.object.PlayState;
 import software.bernie.geckolib.util.GeckoLibUtil;
 
 import javax.annotation.Nullable;
-import java.util.UUID;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
+
 /**
  * 贝阿朵莉切 —— 黄金魔女 / 「黄金碑文」遭遇的主宰者。
- *
- * <p>这一版是<b>完整遭遇</b>，不是占位：所有推进逻辑都在本类，配套件各管一段：
- * <ul>
- *   <li>{@link SacrificeLedger}：只看「带 {@code galboss_epitaph_sacrifice} 标签的实体死了」，
- *       转手调 {@link #onSacrificeDied(Entity)}；谁杀的、是羊还是原版宾客一概不管。</li>
- *   <li>{@link BodySeal}：玩家身上的五处部位封印（头/胸/腹/膝/足），静态状态 + 事件钩子。</li>
- *   <li>{@link EpitaphHud}：每 0.5 秒刷 actionbar（{@link #hudLine()}）并续持续型 debuff。</li>
- *   <li>{@link GoldenLand}：第九夜把整场遭遇搬进 {@code galboss:golden_land}。</li>
- * </ul>
- *
- * <h2>推进方式：只数「倒下了几个」</h2>
- * <p>旧版按夜分组唤醒 13 只羊、第三夜还要玩家在聊天栏打她的名字，联机时极容易卡死。
- * 现在进度是一个客观整数 {@link #kills}：0→17 共 11 个坎（见 {@link #NIGHT_KILLS}），
- * 每跨过一个坎推进一夜，HUD 与 Boss 血条都直接显示「祭品 x/17」。
- *
- * <h2>她为什么打不动</h2>
- * <p>碑文没走完（{@link #kills} &lt; 17）时她对一切伤害免疫，玩家只会看到
- * {@code epitaph.galboss.immune}（「魔女尚未复苏。」）。第 16 位倒下时她「开始苏醒」——
- * 法术冷却减半 + 力量 II / 速度 II，但仍然打不动；第 17 位倒下才真正解除封印：
- * 回满血、清空全部部位封印、狂暴，并把全体参战玩家（和她自己）搬进黄金乡。
  */
 public class BeatriceEntity extends Monster implements GeoEntity {
 
     private static final String ID = "beatrice";
 
-    /** 碑文总祭品数：13 只黑山羊 + 4 位原版宾客。「十八人」= 17 位祭品 + 玩家自己。 */
     public static final int TOTAL_SACRIFICES = 17;
+    /** 岛上总人数 = 贝阿朵莉切本人 + 17 个祭品（碑文设定里的「十八人」）。 */
+    public static final int TOTAL_PEOPLE = TOTAL_SACRIFICES + 1;
     private static final int GOAT_COUNT = 13;
     private static final int GUEST_COUNT = 4;
 
-    /** 遭遇半径：与 BodySeal / EpitaphHud 保持一致。 */
     private static final double ARENA_RADIUS = 64.0;
 
-    /** 第 1~10 夜各自需要的献祭数（第 10 夜是她自己倒下）。 */
     private static final int[] NIGHT_KILLS = {6, 8, 10, 11, 12, 13, 14, 15, 16, 17};
 
-    /** 第 4~8 夜剜下的部位（与 NIGHT_KILLS 的下标一一对应）。 */
     private static final BodySeal.Seal[] NIGHT_SEAL = {
             null, null, null, BodySeal.Seal.HEAD, BodySeal.Seal.CHEST,
             BodySeal.Seal.BELLY, BodySeal.Seal.KNEE, BodySeal.Seal.FOOT, null, null
     };
 
-    /** 宾客池：<b>刻意没有苦力怕</b>（自爆会替玩家免费推进碑文，实机验证时真的发生过）。 */
     private static final EntityType<?>[] GUEST_POOL = {
             EntityType.ZOMBIE, EntityType.SKELETON, EntityType.HUSK,
             EntityType.STRAY, EntityType.SPIDER, EntityType.WITCH
     };
 
-    // 黄金蝶齐射（技能参数见内部类 ButterflyVolleySkill）
-    /** 开场 / 复苏 / 换阶段后的起手延迟：让她先站住摆姿态再出手。 */
     private static final int VOLLEY_FIRST_DELAY = 6 * 20;
-    /** 一次齐射的蝶数（常态；复苏后技能内部会加量）。 */
     private static final int VOLLEY_COUNT = 3;
 
-    /** 祭品巡检间隔：场上少了就补召，保证碑文一定数得满 17。 */
     private static final int REPLENISH_INTERVAL = 2 * 20;
     private static final int REPLENISH_BATCH = 4;
 
@@ -137,52 +119,55 @@ public class BeatriceEntity extends Monster implements GeoEntity {
     private final ServerBossEvent bossEvent = new ServerBossEvent(
             this.getDisplayName(), BossEvent.BossBarColor.YELLOW, BossEvent.BossBarOverlay.PROGRESS);
 
-    /** 碑文是否已经开场（第一次被玩家打 / 右键）。 */
     private boolean ritualActive;
-    /** 已献上的祭品数（0~17）。 */
     private int kills;
-    /** 当前夜（0 = 序章，1~10）。 */
     private int night;
-    /** 第 17 位祭品倒下后的「真复苏」：解除免疫。 */
     private boolean awakened;
 
     private int replenishTimer = REPLENISH_INTERVAL;
     private int immuneHintCd;
     private boolean awakenedAnnounced;
 
-    /** 黄金蝶齐射（自带冷却与状态机的技能）。 */
     private final ButterflyVolleySkill butterflyVolley = new ButterflyVolleySkill();
 
-    /** 排队中的红字（见 {@link #queueRedTruth(String, int)}）。 */
     private String pendingTruthKey;
     private int pendingTruthTicks = -1;
 
-    /** 谢斯塔黄金弓狙击术（自带冷却与状态机，规则同蝴蝶齐射）。 */
     private final SniperSkill sniper = new SniperSkill();
 
-    /**
-     * 大范围魔法（整区块级）的轮换冷却（tick）。
-     *
-     * <p>三招共用一条冷却、随机挑一招：{@link ChessboardJudgementSpell}（棋盘审判）、
-     * {@link GoldenRainSpell}（金雨）、{@link WitchDomainSpell}（魔女领域）。
-     * 复苏（P2）后减半，和蝶群齐射是同一条阶段规则。
-     *
-     * <p>为什么不塞进 {@code boss.BossSkill} 框架：那套的泛型上界是 {@code AbstractFSBossEntity}
-     * （冷却要吃 {@code boss.cd()}），而她 {@code extends Monster} —— 理由和
-     * {@link ButterflyVolleySkill} 那段注释一样。而且这几招的演出状态机已经在
-     * {@code spell.Spell} 里了，boss 这边只需要决定「什么时候放」。
-     */
     private int areaSpellCd = AREA_SPELL_CD;
-
-    /** 大范围魔法的冷却基数（16 秒）。 */
     private static final int AREA_SPELL_CD = 16 * 20;
 
+    /** 场地魔法（棋盘场地）的冷却：比领域法术长得多，因为它本身要挂 30 秒。 */
+    private static final int FIELD_SPELL_CD = 45 * 20;
+    private int fieldSpellCd = FIELD_SPELL_CD;
+
+    // ------------------------------------------------------------------ 近战闪避瞬移
+
+    /** 两次闪避之间的最小间隔。真复苏后才有意义（此前本来就免疫伤害）。 */
+    private static final int DODGE_COOLDOWN = 6 * 20;
+
     /**
-     * 和平难度下也不消失（理由见 {@code AbstractFSBossEntity#shouldDespawnInPeaceful}）。
-     *
-     * <p>她不是 {@code AbstractFSBossEntity} 的子类（{@code extends Monster}），
-     * 所以这条要单独写一遍，否则四个人里只有她会在切和平难度时被静默抹掉。
+     * 触发概率。设成 1.0 = 只要冷却好了就必躲。
+     * 之前是 0.6，砍十刀只躲两三下，实机很容易误判成「根本没生效」。
      */
+    private static final float DODGE_CHANCE = 1.0f;
+
+    /** 瞬移落点与当前位置的距离区间（格）。 */
+    private static final double DODGE_MIN_DISTANCE = 6.0;
+    private static final double DODGE_MAX_DISTANCE = 10.0;
+
+    /** 只在这个距离内才认为「近战打过来了」，超出多半是弹射物或远程。 */
+    private static final double DODGE_TRIGGER_RANGE = 5.0;
+
+    /** 落点不能离攻击者太近，否则等于原地挨打。 */
+    private static final double DODGE_KEEP_AWAY = 4.0;
+
+    /** 诊断日志预算：前几次闪避判定把结论打进日志，之后静默。 */
+    private static int DODGE_DEBUG_BUDGET = 10;
+
+    private int dodgeCd;
+
     @Override
     protected boolean shouldDespawnInPeaceful() {
         return false;
@@ -197,7 +182,7 @@ public class BeatriceEntity extends Monster implements GeoEntity {
 
     public static AttributeSupplier.Builder createAttributes() {
         return Monster.createMonsterAttributes()
-                .add(Attributes.MAX_HEALTH, 400.0)
+                .add(Attributes.MAX_HEALTH, 1986.0)
                 .add(Attributes.ATTACK_DAMAGE, 10.0)
                 .add(Attributes.MOVEMENT_SPEED, 0.30)
                 .add(Attributes.ARMOR, 6.0)
@@ -210,7 +195,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
-        // 只有真复苏之后才会追人打近战 —— 碑文期间她站着看戏
         this.goalSelector.addGoal(2, new AwakenedMeleeGoal());
         this.goalSelector.addGoal(5, new WaterAvoidingRandomStrollGoal(this, 0.8));
         this.goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 16.0f));
@@ -219,7 +203,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Player.class, true));
     }
 
-    /** 近战只在复苏后开放：碑文期间她不该追着玩家打。 */
     private class AwakenedMeleeGoal extends MeleeAttackGoal {
 
         private AwakenedMeleeGoal() {
@@ -239,7 +222,26 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         }
     }
 
-    // ------------------------------------------------------------------ 主循环
+    // ------------------------------------------------------------------ 主循环 & 客户端氛围粒子
+
+    @Override
+    public void aiStep() {
+        super.aiStep();
+        if (this.level().isClientSide && this.isAlive()) {
+            // 客户端常驻黄金蝶光环：常态轻盈环绕，碑文开启与真复苏后逐渐浓郁
+            int interval = this.awakened ? 4 : (this.ritualActive ? 7 : 14);
+            if (this.tickCount % interval == 0) {
+                double angle = this.random.nextDouble() * Math.PI * 2.0;
+                double radius = 0.65 + this.random.nextDouble() * 0.75;
+                double py = this.getY() + 0.25 + this.random.nextDouble() * (this.getBbHeight() * 0.85);
+                this.level().addParticle(ModParticles.GOLDEN_BUTTERFLY.get(),
+                        this.getX() + Math.cos(angle) * radius,
+                        py,
+                        this.getZ() + Math.sin(angle) * radius,
+                        0.0, 0.0, 0.0);
+            }
+        }
+    }
 
     @Override
     public void tick() {
@@ -250,28 +252,33 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         if (this.immuneHintCd > 0) {
             this.immuneHintCd--;
         }
-        // 谢斯塔狙击术放在碑文门之前：一旦锁定就必须走完「2 秒 → 光箭」，
-        // 不能因为碑文没开 / 被打断就卡在锁定态（调试命令 /galboss sniper 也走这条路）。
+        if (this.dodgeCd > 0) {
+            this.dodgeCd--;
+        }
         this.sniper.tick(this);
 
         if (!this.ritualActive) {
             return;
         }
 
-        // 黄金蝶齐射（技能）：预警 → 两波齐射 → 收招，冷却在收起后起算
+        // 等死亡事件和祭品存活状态都更新后，再推进到黄金乡；重载后也能继续。
+        if (this.kills >= TOTAL_SACRIFICES && this.tickCount % 20 == 0
+                && this.level() instanceof ServerLevel level
+                && !level.dimension().equals(GoldenLand.DIMENSION)
+                && this.tryEnterGoldenLand(level)) {
+            return;
+        }
+
         this.butterflyVolley.tick(this);
-
-        // 大范围魔法（整区块级）：三招轮换，P2 后冷却减半
         this.tickAreaSpells();
+        this.tickFieldSpell();
 
-        // 排队中的红字（屏幕单行，金藏那句念完再念「真实」）
         if (this.pendingTruthTicks > 0 && --this.pendingTruthTicks == 0 && this.pendingTruthKey != null) {
             this.redTruth(this.pendingTruthKey);
             this.pendingTruthKey = null;
             this.pendingTruthTicks = -1;
         }
 
-        // 祭品巡检：只在碑文未走完、且还有玩家在战场内时补召
         if (!this.awakened && --this.replenishTimer <= 0) {
             this.replenishTimer = REPLENISH_INTERVAL;
             this.replenishSacrifices();
@@ -279,7 +286,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         this.updateBossBar();
     }
 
-    /** 有没有可以当目标的人（她自己的目标优先，其次 40 格内最近的玩家）。 */
     private boolean hasNearbyTarget() {
         return this.findCombatTarget() != null;
     }
@@ -301,11 +307,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
 
     // ------------------------------------------------------------------ 开场
 
-    /**
-     * 第一次被玩家打 / 右键 → 开碑文。
-     *
-     * <p>开场是「一次性」的：重复调用直接返回，避免连击第二下就把 17 位祭品召两遍。
-     */
     public void startRitual() {
         if (this.ritualActive || this.level().isClientSide) {
             return;
@@ -322,11 +323,16 @@ public class BeatriceEntity extends Monster implements GeoEntity {
             if (server != null) {
                 BodySeal.bind(server, this.getUUID());
             }
+            // 开场召唤阵与黄金蝶群绽放
+            PixelfxFx.play(level, this.position().add(0.0, 0.08, 0.0),
+                    PixelfxSlugs.TOHKA_CONVOCATION_CIRCLE, 2.6f, 0.0f);
+            level.sendParticles(ModParticles.GOLDEN_BUTTERFLY.get(),
+                    this.getX(), this.getY() + 1.2, this.getZ(), 16, 1.4, 0.8, 1.4, 0.03);
+            SpellFx.shake(level, this.position(), 36.0, 0.45f, 8);
         }
         this.bossEvent.setVisible(true);
         this.updateBossBar();
 
-        // 碑文原文进聊天栏（2026-11-17 改：原先走屏幕中央红字，会和死亡触发的红字叠在一起）
         this.say("epitaph.galboss.preamble.1", ChatFormatting.DARK_RED);
         this.say("epitaph.galboss.preamble.2", ChatFormatting.DARK_RED);
         this.say("epitaph.galboss.start", ChatFormatting.LIGHT_PURPLE);
@@ -336,7 +342,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         this.playSoundAt(SoundEvents.EVOKER_PREPARE_SUMMON, 1.4f, 0.8f);
     }
 
-    /** 召一批祭品（黑山羊 + 原版宾客），带祭品标签。 */
     private void summonSacrifices(int total) {
         int goats = Math.min(GOAT_COUNT, total);
         int guests = Math.max(0, total - goats);
@@ -365,6 +370,7 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         goat.setCustomName(Component.translatable("epitaph.galboss.goat_name"));
         goat.setCustomNameVisible(false);
         level.addFreshEntity(goat);
+        GoldenButterflyBurst.burstAtChest(level, spawn);
     }
 
     private void summonGuest(int index) {
@@ -382,16 +388,15 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         guest.setPersistenceRequired();
         guest.setCustomName(Component.translatable("epitaph.galboss.guest_name", type.getDescription()));
         guest.setCustomNameVisible(false);
-        // 亡灵白天会被晒死 → 送一顶皮革帽，免得它们自己替玩家推进碑文
         guest.setItemSlot(EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
         LivingEntity target = this.findCombatTarget();
         if (target != null) {
             guest.setTarget(target);
         }
         level.addFreshEntity(guest);
+        GoldenButterflyBurst.burstAtChest(level, spawn);
     }
 
-    /** 环形落点：她自己身边 3.0~7.5 格，避免 17 只全叠在一格里。 */
     private Vec3 ringPosition(int index) {
         double angle = (Math.PI * 2.0 * index) / Math.max(1, TOTAL_SACRIFICES)
                 + this.random.nextDouble() * 0.25;
@@ -401,7 +406,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
                 this.getZ() + Math.sin(angle) * distance);
     }
 
-    /** 场上还活着的祭品数（同维度、64 格内）。 */
     private List<Entity> aliveSacrifices() {
         AABB box = this.getBoundingBox().inflate(ARENA_RADIUS);
         return this.level().getEntitiesOfClass(Entity.class, box,
@@ -412,7 +416,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         return this.aliveSacrifices().size();
     }
 
-    /** 巡检：场上祭品少于「还需要倒下的数」就补召，单次最多 4 只。 */
     private void replenishSacrifices() {
         if (!this.ritualActive || this.awakened) {
             return;
@@ -421,7 +424,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         if (needed <= 0) {
             return;
         }
-        // 场上没有玩家就别补：补了也是站着，只会白拉实体
         if (this.level() instanceof ServerLevel level && level.getNearestPlayer(this, ARENA_RADIUS) == null) {
             return;
         }
@@ -432,7 +434,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         int batch = Math.min(REPLENISH_BATCH, missing);
         int start = this.countSacrifices();
         for (int i = 0; i < batch; i++) {
-            // 前 13 位维持「羊为主」的气质：补召时按缺口多补宾客
             if (this.random.nextFloat() < 0.72f) {
                 this.summonGoat(start + i);
             } else {
@@ -443,18 +444,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
 
     // ------------------------------------------------------------------ 献祭推进
 
-    /**
-     * 一位祭品倒下（由 {@link SacrificeLedger} 转手过来）。
-     *
-     * <p>只认「数量」：这是碑文的唯一推进方式。
-     *
-     * <p>红字规则（2026-11-17 按用户要求）：
-     * <ul>
-     *   <li>第一个祭品倒下 → 「右代宫金藏已死。」（十八人里第一个是他）</li>
-     *   <li>每次祭品倒下 → 三句「真实」里随机一句（六轩岛无人、房间无人进出、无机关暗道毒药）</li>
-     *   <li>碑文原文本身仍然只进聊天栏，不占屏幕中央</li>
-     * </ul>
-     */
     public void onSacrificeDied(Entity dead) {
         if (this.level().isClientSide || !this.ritualActive) {
             return;
@@ -463,9 +452,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         this.advanceNights(false);
         this.updateBossBar();
 
-        // 红字：第一个祭品是金藏；之后每次随机念一句「真实」。
-        // 屏幕同时只显示一行，所以第一个祭品要排队：先金藏，2.5 秒后再念「真实」那三句之一，
-        // 否则后一句会把前一句当场顶掉，金藏那句等于没出现过。
         String truth = "redtruth.galboss.truth." + (1 + this.random.nextInt(3));
         if (this.kills == 1) {
             this.redTruth("redtruth.galboss.kinzo_dead");
@@ -477,15 +463,13 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         if (!(this.level() instanceof ServerLevel level)) {
             return;
         }
+        // 祭品化为魂火与黄金蝶飞向魔女
         level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME,
                 dead.getX(), dead.getY() + 0.8, dead.getZ(), 12, 0.3, 0.5, 0.3, 0.02);
+        level.sendParticles(ModParticles.BURST_BUTTERFLY.get(),
+                dead.getX(), dead.getY() + 0.9, dead.getZ(), 4, 0.0, 0.0, 0.0, 0.0);
     }
 
-    /**
-     * 按 {@link #NIGHT_KILLS} 把该推进的夜一次推完（一次死两个也不会漏）。
-     *
-     * @param quiet debug 用：不播报、不华丽地传送
-     */
     private void advanceNights(boolean quiet) {
         while (this.night < NIGHT_KILLS.length && this.kills >= NIGHT_KILLS[this.night]) {
             this.night++;
@@ -497,7 +481,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         if (newNight <= 0 || newNight > NIGHT_KILLS.length) {
             return;
         }
-        // 前九夜都要念一句碑文；第十夜是她的死。碑文一律进聊天栏（红字位留给「事实」）
         if (newNight < 10) {
             if (!quiet) {
                 this.say("epitaph.galboss.night." + newNight, ChatFormatting.DARK_RED);
@@ -506,15 +489,17 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         }
 
         if (newNight == 3) {
-            // 第三夜「高贵之名」：剩下的祭品集体狂暴
             this.enrageSacrifices();
             if (!quiet) {
                 this.say("epitaph.galboss.enrage", ChatFormatting.DARK_RED);
+                if (this.level() instanceof ServerLevel server) {
+                    PixelfxFx.play(server, this.position().add(0.0, 0.05, 0.0),
+                            PixelfxSlugs.TOHKA_BELL_WAVE, 2.0f, 0.0f);
+                }
             }
             return;
         }
         if (newNight == 9) {
-            // 第九夜第一阶段：她开始苏醒（仍然免疫）
             this.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, Integer.MAX_VALUE, 1, false, false, true));
             this.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SPEED, Integer.MAX_VALUE, 1, false, false, true));
             if (!this.awakenedAnnounced) {
@@ -523,49 +508,60 @@ public class BeatriceEntity extends Monster implements GeoEntity {
                     this.say("epitaph.galboss.awaken", ChatFormatting.DARK_RED);
                     this.triggerAnim(CONTROLLER, "cast_area");
                     this.playSoundAt(SoundEvents.WITHER_SPAWN, 1.6f, 0.7f);
+                    if (this.level() instanceof ServerLevel server) {
+                        PixelfxFx.play(server, this.position().add(0.0, 1.2, 0.0),
+                                PixelfxSlugs.EPITAPH_AEGIS, 0.55f, 0.0f);
+                        server.sendParticles(ModParticles.GOLDEN_BUTTERFLY.get(),
+                                this.getX(), this.getY() + 1.2, this.getZ(), 20, 1.5, 1.0, 1.5, 0.04);
+                        SpellFx.shake(server, this.position(), 40.0, 0.6f, 10);
+                    }
                 }
             }
-            // 第 17 位（NIGHT_KILLS[9]）在同一夜里触发真复苏
-            if (this.kills >= TOTAL_SACRIFICES) {
-                this.awaken(quiet);
-            }
+            return;
+        }
+        if (newNight == NIGHT_KILLS.length) {
+            this.awaken(quiet);
             return;
         }
         BodySeal.Seal seal = NIGHT_SEAL[newNight - 1];
         if (seal != null) {
             BodySeal.seal(seal);
             if (!quiet) {
-                // 「剜去%1$s。」→ 玩家的「你的%1$s被剜去了。」→ 行为型封印的操作提示
                 this.say("epitaph.galboss.seal.line", ChatFormatting.DARK_PURPLE, seal.displayName());
                 this.say("epitaph.galboss.seal.apply", ChatFormatting.RED, seal.displayName());
+                if (this.level() instanceof ServerLevel server) {
+                    GoldenButterflyBurst.burstAtChest(server, this.position());
+                    for (ServerPlayer p : server.players()) {
+                        if (p.distanceTo(this) <= ARENA_RADIUS && !p.isSpectator()) {
+                            server.sendParticles(ParticleTypes.WITCH,
+                                    p.getX(), p.getY() + 1.0, p.getZ(), 12, 0.4, 0.5, 0.4, 0.02);
+                        }
+                    }
+                }
                 switch (seal) {
                     case CHEST -> this.say("epitaph.galboss.hint.chest", ChatFormatting.GRAY);
                     case BELLY -> this.say("epitaph.galboss.hint.belly", ChatFormatting.GRAY);
                     case KNEE -> this.say("epitaph.galboss.hint.knee", ChatFormatting.GRAY);
                     default -> {
-                        // 头（失明）与足（禁足）是持续型 debuff，效果本身就能看懂，不再单独提示
                     }
                 }
             }
         }
     }
 
-    /** 第三夜：剩下的祭品一起获得力量 I + 速度 I。 */
     private void enrageSacrifices() {
         for (Entity sacrifice : this.aliveSacrifices()) {
             if (sacrifice instanceof LivingEntity living) {
                 living.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, 20 * 60 * 30, 0, false, true, true));
                 living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SPEED, 20 * 60 * 30, 0, false, true, true));
+                if (this.level() instanceof ServerLevel server) {
+                    server.sendParticles(ParticleTypes.WITCH,
+                            living.getX(), living.getY() + 0.9, living.getZ(), 10, 0.35, 0.4, 0.35, 0.02);
+                }
             }
         }
     }
 
-    /**
-     * 真复苏（第 17 位祭品倒下）。
-     *
-     * <p>顺序很重要：先清封印（连带把玩家身上的失明/禁足摘掉）→ 回满血 → 上狂暴 →
-     * 把参战玩家送进黄金乡 → 自己跟过去。维度没加载出来时明确报缺口，不假装传送成功。
-     */
     private void awaken(boolean quiet) {
         if (this.awakened) {
             return;
@@ -588,6 +584,18 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         if (!(this.level() instanceof ServerLevel level)) {
             return;
         }
+        // 黄金乡开启前的全屏黄金蝶爆发与震屏
+        GoldenButterflyBurst.burstAtChest(level, this.position());
+        PixelfxFx.play(level, this.position().add(0.0, 0.05, 0.0),
+                PixelfxSlugs.TOHKA_BELL_WAVE, 2.6f, 0.0f);
+        SpellFx.shake(level, this.position(), 48.0, 0.95f, 14);
+
+    }
+
+    private boolean tryEnterGoldenLand(ServerLevel level) {
+        if (!this.isAlive() || this.countSacrifices() != 0) {
+            return false;
+        }
         MinecraftServer server = level.getServer();
         List<ServerPlayer> participants = new ArrayList<>();
         for (ServerPlayer player : level.players()) {
@@ -599,28 +607,20 @@ public class BeatriceEntity extends Monster implements GeoEntity {
             }
         }
         ServerLevel golden = GoldenLand.level(server);
-        if (golden == null || !GoldenLand.sendPlayers(server, participants)) {
-            this.say("epitaph.galboss.goldenland_missing", ChatFormatting.YELLOW);
-            return;
+        if (participants.isEmpty() || golden == null) {
+            return false;
         }
-        this.followIntoGoldenLand(golden);
+        GoldenLand.prepare(golden);
+        return this.followIntoGoldenLand(golden, participants);
     }
 
-    /**
-     * 把自己搬到黄金乡：显式建新实例 + 拷贝碑文状态，旧实例 {@code discard()}。
-     *
-     * <p><b>不要</b>用 {@code changeDimension}：Forge 对非玩家实体的跨维度会新建一个实例，
-     * 原实例不一定被移除 —— 实机验证时同一场测试留下了 4 个残留的贝阿朵莉切，
-     * 而且对它调用 {@code moveTo} 是作用在已经失效的旧实例上（她没跟过去）。
-     */
-    private void followIntoGoldenLand(ServerLevel golden) {
+    private boolean followIntoGoldenLand(ServerLevel golden, List<ServerPlayer> participants) {
         BeatriceEntity moved = ModEntities.BEATRICE.get().create(golden);
         if (moved == null) {
-            this.say("epitaph.galboss.goldenland_missing", ChatFormatting.YELLOW);
-            return;
+            return false;
         }
-        moved.moveTo(GoldenLand.SPAWN.x + 4.0, GoldenLand.SPAWN.y, GoldenLand.SPAWN.z,
-                this.getYRot(), 0.0f);
+        Vec3 beatriceDest = new Vec3(GoldenLand.SPAWN.x + 4.0, GoldenLand.SPAWN.y, GoldenLand.SPAWN.z);
+        moved.moveTo(beatriceDest.x, beatriceDest.y, beatriceDest.z, this.getYRot(), 0.0f);
         moved.setYHeadRot(this.getYHeadRot());
         moved.ritualActive = true;
         moved.kills = this.kills;
@@ -630,8 +630,15 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         moved.butterflyVolley.reset(VOLLEY_FIRST_DELAY);
         moved.setHealth(moved.getMaxHealth());
         moved.bossEvent.setVisible(true);
-        golden.addFreshEntity(moved);
+        if (!golden.addFreshEntity(moved)) {
+            return false;
+        }
         MinecraftServer server = golden.getServer();
+        if (!GoldenLand.sendPlayers(server, participants)) {
+            moved.discard();
+            return false;
+        }
+        GoldenButterflyBurst.burstAtChest(golden, beatriceDest);
         if (server != null) {
             BodySeal.bind(server, moved.getUUID());
         }
@@ -641,11 +648,11 @@ public class BeatriceEntity extends Monster implements GeoEntity {
             }
         }
         this.discard();
+        return true;
     }
 
-    // ------------------------------------------------------------------ 黄金蝶
+    // ------------------------------------------------------------------ 黄金蝶齐射（折扇展开）
 
-    /** 齐射：在她身前 1.2 格生成，避免贴脸那一下就撞到自己（README 记的两个坑之一）。 */
     public void volley(int count) {
         if (this.level().isClientSide) {
             return;
@@ -653,34 +660,45 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         LivingEntity target = this.findCombatTarget();
         int n = Math.max(1, Math.min(12, count));
         Vec3 look = this.getLookAngle();
-        Vec3 side = new Vec3(-look.z, 0.0, look.x).normalize();
+        Vec3 flatLook = new Vec3(look.x, 0.0, look.z);
+        if (flatLook.lengthSqr() < 1.0E-4) {
+            flatLook = new Vec3(0.0, 0.0, 1.0);
+        } else {
+            flatLook = flatLook.normalize();
+        }
+        Vec3 side = new Vec3(-flatLook.z, 0.0, flatLook.x);
+
+        Vec3 muzzleCenter = this.position()
+                .add(look.scale(1.2))
+                .add(0.0, this.getEyeHeight() - 0.25, 0.0);
+
+        if (this.level() instanceof ServerLevel server) {
+            server.sendParticles(ModParticles.BURST_STAR.get(),
+                    muzzleCenter.x, muzzleCenter.y, muzzleCenter.z, 1, 0.05, 0.05, 0.05, 0.0);
+        }
+
         for (int i = 0; i < n; i++) {
             ButterflyMissileEntity missile = ModEntities.BUTTERFLY_MISSILE.get().create(this.level());
             if (missile == null) {
                 continue;
             }
-            double offset = (i - (n - 1) / 2.0) * 0.42;
-            Vec3 spawn = this.position()
-                    .add(look.scale(1.2))
-                    .add(side.scale(offset))
-                    .add(0.0, this.getEyeHeight() - 0.25, 0.0);
+            double norm = n == 1 ? 0.0 : ((i / (double) (n - 1)) * 2.0 - 1.0);
+            double offset = norm * (0.38 * Math.min(n - 1, 4) * 0.5);
+            Vec3 spawn = muzzleCenter.add(side.scale(offset));
+
+            // 折扇式初始扩散矢量：先向左右及微上方展开弧线，随后由 ButterflyMissileEntity 弯曲收束追踪
+            double fanLateral = norm * 0.46;
+            double fanVertical = 0.10 + (1.0 - Math.abs(norm)) * 0.08;
+            Vec3 initialSpread = side.scale(fanLateral).add(0.0, fanVertical, 0.0);
+
             missile.moveTo(spawn.x, spawn.y, spawn.z, this.getYRot(), this.getXRot());
-            missile.launch(this, target, 0.85 + this.random.nextDouble() * 0.30);
+            missile.launch(this, target, 0.85 + this.random.nextDouble() * 0.30, initialSpread);
             this.level().addFreshEntity(missile);
         }
         this.triggerAnim(CONTROLLER, "cast");
         this.playSoundAt(SoundEvents.EVOKER_CAST_SPELL, 1.2f, 1.35f);
     }
 
-    /**
-     * 大范围魔法调度：冷却到了就在<b>目标脚下</b>放一招覆盖整个区块的魔法。
-     *
-     * <p>位置取目标而不是她自己：这几招的范围是一个区块，落在她身上等于打不到人。
-     * 落在目标脚下，玩家读到的就是「这一块归我」，跑出区块才有意义。
-     *
-     * <p>没有目标时<b>不重置冷却</b>（置 1 让下一 tick 再试），否则她会一直卡在
-     * 「刚想放就被清空冷却」的循环里。
-     */
     private void tickAreaSpells() {
         if (--this.areaSpellCd > 0) {
             return;
@@ -696,38 +714,39 @@ public class BeatriceEntity extends Monster implements GeoEntity {
             case 1 -> GoldenRainSpell.cast(this.level(), at, this);
             default -> WitchDomainSpell.cast(this.level(), at, this);
         }
-        this.triggerAnim(CONTROLLER, "cast");
+        this.triggerAnim(CONTROLLER, "cast_area");
         this.playSoundAt(SoundEvents.EVOKER_CAST_SPELL, 1.4f, 0.75f);
         this.areaSpellCd = this.awakened ? AREA_SPELL_CD / 2 : AREA_SPELL_CD;
     }
 
     /**
-     * 技能：黄金蝶齐射（自带冷却与状态机）。
+     * 场地魔法：以自己为圆心铺一层持续翻转的棋盘。
      *
-     * <p>整段「技能」而不是「定时丢一发」：预警（身前聚蝶 + 地面光圈）→ 第一波齐射 →
-     * 半秒后第二波 → 收招；打出去的是 {@link ButterflyMissileEntity}，飞行尾迹与命中爆炸
-     * 用的是同一只 ER 橙蝶，从出手到砸中读得出是同一招。
-     *
-     * <p>为什么不用 {@code boss.BossSkill} 那套框架：它的泛型上界是
-     * {@code AbstractFSBossEntity}（因为冷却要吃 {@code boss.cd()} 的倍率），
-     * 而贝阿朵莉切 {@code extends Monster}。为一条技能去放宽整个框架的上界，改动面大于收益，
-     * 所以这里用一个结构对齐的状态机：参数（预警 / 两波 / 收招 / 冷却秒数）和礼那套一样，
-     * 复苏（P2）加量也在这里表达。
+     * <p>和 {@link #tickAreaSpells()} 分开管——场地魔法挂 30 秒，
+     * 如果和 16 秒一轮的领域法术共用冷却会重叠成两层棋盘，玩家根本没法走位。
      */
+    private void tickFieldSpell() {
+        if (--this.fieldSpellCd > 0) {
+            return;
+        }
+        if (this.findCombatTarget() == null) {
+            this.fieldSpellCd = 1;
+            return;
+        }
+        ChessboardFieldSpell.cast(this.level(), this.position(), this);
+        this.triggerAnim(CONTROLLER, "cast_area");
+        this.playSoundAt(SoundEvents.EVOKER_CAST_SPELL, 1.5f, 0.6f);
+        this.fieldSpellCd = FIELD_SPELL_CD;
+    }
+
     private static final class ButterflyVolleySkill {
 
-        /** 冷却（tick）：复苏后减半，对应原来 VOLLEY_CD / VOLLEY_CD_AWAKENED。 */
         private static final int COOLDOWN = 12 * 20;
-        /** 预警时长：1 秒，够玩家看出「她要放蝶了」。 */
         private static final int TELEGRAPH = 20;
-        /** 第二波与第一波的间隔。 */
         private static final int SECOND_WAVE_DELAY = 12;
-        /** 第二波之后的收招时间。 */
         private static final int RECOVERY = 30;
 
-        /** 剩余冷却（tick）；-1 之外的负数不用。 */
         private int cooldown;
-        /** 施放进度：-1 = 没在放。 */
         private int elapsed = -1;
         private int waves;
 
@@ -739,7 +758,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
             this.cooldown = Math.max(0, ticks);
         }
 
-        /** 收掉当前施放并把冷却重置到指定值（开场 / 复苏 / 换阶段用）。 */
         void reset(int cooldownTicks) {
             this.elapsed = -1;
             this.waves = 0;
@@ -775,14 +793,18 @@ public class BeatriceEntity extends Monster implements GeoEntity {
                     BossTelegraph.circle(boss.level(), boss.position(), 1.2 + t * 0.12,
                             BossTelegraph.VIOLET);
                 }
-                // 蓄力：先在身前聚一小撮橙蝶（只是预告，不造成伤害）
-                if (t % 6 == 0 && boss.level() instanceof ServerLevel server) {
+                // 蓄力期在身前汇聚盘旋黄金蝶与星屑，预告即将齐射
+                if (t % 4 == 0 && boss.level() instanceof ServerLevel server) {
                     Vec3 look = boss.getLookAngle();
+                    double angle = t * 0.55;
+                    double swirlR = Mth.lerp(t / (float) TELEGRAPH, 1.2, 0.25);
+                    double sx = boss.getX() + look.x * 1.15 + Math.cos(angle) * swirlR;
+                    double sy = boss.getY() + boss.getEyeHeight() - 0.15 + Math.sin(angle * 1.5) * 0.25;
+                    double sz = boss.getZ() + look.z * 1.15 + Math.sin(angle) * swirlR;
                     server.sendParticles(ModParticles.GOLDEN_BUTTERFLY.get(),
-                            boss.getX() + look.x * 1.1,
-                            boss.getY() + boss.getEyeHeight() - 0.2,
-                            boss.getZ() + look.z * 1.1,
-                            2, 0.35, 0.30, 0.35, 0.01);
+                            sx, sy, sz, 1, 0.08, 0.08, 0.08, 0.0);
+                    server.sendParticles(ModParticles.BURST_DOT.get(),
+                            sx, sy, sz, 1, 0.05, 0.05, 0.05, 0.01);
                 }
                 return;
             }
@@ -801,40 +823,13 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         }
     }
 
-    /**
-     * 技能：谢斯塔黄金弓狙击术。
-     *
-     * <p>流程（用户指定的规则）：
-     * <ol>
-     *   <li>选中 40 格内的一名玩家，**锁定 2 秒**：屏幕给受害者打「被瞄准」提示 +
-     *       画一条贯穿他的红外线（旁观者也能看见这道线，见 {@code SniperBeamRenderer}）；</li>
-     *   <li>2 秒到点射出一支<b>光箭</b>（{@code SniperArrowEntity}）：追踪、不撞方块，
-     *       命中扣「当前生命的一半」（魔法伤害，护甲挡不住）；</li>
-     *   <li>命中处溅血（{@code blood_drop} / {@code blood_splash}）。</li>
-     * </ol>
-     *
-     * <p>锁定期间每 5 tick 重发一次瞄准线（寿命 10 tick）：线会跟着目标走，
-     * 而不是钉在锁定瞬间的位置上。
-     */
     private static final class SniperSkill {
 
-        /** 冷却（tick）：用户要求「每次间隔 1 分钟」。 */
         private static final int COOLDOWN = 60 * 20;
-        /**
-         * 只在「已献上的祭品 &lt; 10」时可用。
-         *
-         * <p>谢斯塔（Siesta）是碑文前半段的处刑人：祭品数过了 10（也就是进入第六夜之后）
-         * 这个技能就不该再出现，留给后半段的近战/法术。复苏发生在第 17 位，
-         * 与「&lt;10」互斥，所以这里也不需要再写「复苏后冷却减半」。
-         */
         private static final int SACRIFICE_LIMIT = 10;
-        /** 锁定时长：用户要求的 2 秒。 */
         private static final int LOCK_TICKS = 40;
-        /** 射完到收招结束。 */
         private static final int RECOVERY = 14;
-        /** 锁定范围（格）。 */
         private static final double RANGE = 40.0;
-        /** 瞄准线刷新间隔与单次寿命。 */
         private static final int BEAM_REFRESH = 5;
         private static final int BEAM_LIFE = 10;
 
@@ -849,22 +844,11 @@ public class BeatriceEntity extends Monster implements GeoEntity {
                     this.cooldown--;
                     return;
                 }
-                if (!boss.ritualActive) {
-                    return;
-                }
-                if (!available(boss)) {
-                    if (boss.tickCount % 100 == 0) {
-                        com.example.galboss.GalBoss.LOGGER.info(
-                                "[Sniper] skipped: sacrifices {} >= {}", boss.kills, SACRIFICE_LIMIT);
-                    }
+                if (!boss.ritualActive || !available(boss)) {
                     return;
                 }
                 Player target = pickTarget(boss);
                 if (target == null) {
-                    if (boss.tickCount % 40 == 0) {
-                        com.example.galboss.GalBoss.LOGGER.info("[Sniper] no target in {} blocks (ritual={})",
-                                (int) RANGE, boss.ritualActive);
-                    }
                     return;
                 }
                 start(boss, target);
@@ -872,7 +856,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
             advance(boss);
         }
 
-        /** 触发条件：碑文进行中且已献上的祭品还不到 10 个。 */
         private boolean available(BeatriceEntity boss) {
             return boss.ritualActive && boss.kills < SACRIFICE_LIMIT;
         }
@@ -897,11 +880,8 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         private void start(BeatriceEntity boss, Player target) {
             this.elapsed = 0;
             this.lockedUuid = target.getUUID();
-            com.example.galboss.GalBoss.LOGGER.info("[Sniper] lock on {} (dist {})",
-                    target.getName().getString(), String.format("%.1f", boss.distanceTo(target)));
             boss.triggerAnim(CONTROLLER, "cast");
             boss.playSoundAt(SoundEvents.ARROW_SHOOT, 1.4f, 1.6f);
-            // 受害者屏幕上的「被瞄准」提示
             ModNetwork.sendToPlayer(target, S2CSniperLockPacket.lock(LOCK_TICKS));
             sendBeam(boss, target);
         }
@@ -942,7 +922,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
             arrow.launch(boss, target);
             boss.level().addFreshEntity(arrow);
             boss.playSoundAt(SoundEvents.CROSSBOW_SHOOT, 1.6f, 1.5f);
-            // 光箭已经在路上：屏幕上的锁定提示收掉（红线也一起收）
             this.releaseLock(boss);
         }
 
@@ -953,13 +932,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
             }
         }
 
-        /**
-         * 解析锁定目标。
-         *
-         * <p>⚠ 必须走 {@code PlayerList.getPlayer(uuid)}：{@code ServerLevel.getEntity(UUID)} 查的是
-         * 实体表，<b>玩家不在里面</b>（玩家单独存在 {@code ServerLevel.players} 里），
-         * 用 getEntity 会永远拿到 null —— 实测现象是「锁定了但 2 秒后什么都没发生」。
-         */
         @Nullable
         private Player resolveLocked(BeatriceEntity boss) {
             if (this.lockedUuid == null || boss.getServer() == null) {
@@ -979,11 +951,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         }
     }
 
-    /**
-     * 调试入口：立刻对指定玩家放一次狙击（`/galboss sniper` 用）。
-     *
-     * @return true 表示这次锁定真的开始了（目标在世界里、不是旁观/创造）
-     */
     public boolean debugSnipe(Player target) {
         if (this.level().isClientSide || target == null || this.sniper.elapsed >= 0) {
             return false;
@@ -992,7 +959,7 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         return true;
     }
 
-    // ------------------------------------------------------------------ 受击 / 交互
+    // ------------------------------------------------------------------ 受击 / 交互 / 死亡
 
     @Override
     public boolean hurt(DamageSource source, float amount) {
@@ -1000,21 +967,184 @@ public class BeatriceEntity extends Monster implements GeoEntity {
             return super.hurt(source, amount);
         }
         Entity attacker = source.getEntity();
-        // 第一次被玩家打 → 开场（这一下照打，之后就免疫了）
         if (!this.ritualActive && attacker instanceof Player) {
             this.startRitual();
             return super.hurt(source, amount);
         }
+        // 只要进入战斗（仪式已开始）就启用瞬移闪避，不再等真复苏。
+        // 放在免疫判定之前：躲掉的话连「免疫」提示都不用弹，画面反馈更直接。
+        if (this.ritualActive && this.tryDodgeMelee(source, attacker)) {
+            return false;
+        }
         if (this.ritualActive && !this.awakened) {
-            // /kill 与虚空等「无视无敌」的伤害必须放行：
-            // 之前无差别 return false，结果管理员连 /kill 都杀不掉她（残留了 4 个实例）
-            if (source.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) {
+            if (source.is(DamageTypeTags.BYPASSES_INVULNERABILITY)) {
                 return super.hurt(source, amount);
             }
             this.immuneHint();
             return false;
         }
+        // 真复苏后闪避成功 = 这一刀彻底落空（伤害不结算）
+        if (this.tryDodgeMelee(source, attacker)) {
+            return false;
+        }
         return super.hurt(source, amount);
+    }
+
+    // ------------------------------------------------------------------ 近战闪避瞬移实现
+
+    /**
+     * 近战打过来时瞬移躲开。返回 true 表示已经躲掉，调用方必须丢弃这次伤害。
+     *
+     * <p>只对「直接接触型」攻击生效：弹射物（箭/蝶）走 {@link DamageTypeTags#IS_PROJECTILE}
+     * 分支直接放行，间接伤害（如法术）也放行——只躲刀剑和近身爪击。
+     */
+    private boolean tryDodgeMelee(DamageSource source, @Nullable Entity attacker) {
+        if (this.dodgeCd > 0) {
+            this.dodgeLog("冷却中 (" + this.dodgeCd + " tick)");
+            return false;
+        }
+        if (this.level().isClientSide || !(this.level() instanceof ServerLevel server)) {
+            this.dodgeLog("非服务端");
+            return false;
+        }
+        if (source.is(DamageTypeTags.IS_PROJECTILE)) {
+            this.dodgeLog("弹射物，不躲");
+            return false;
+        }
+        // 直接伤害：命中体就是攻击者本人（弹射物的命中体是箭，不是人）
+        if (!(source.getDirectEntity() instanceof LivingEntity melee) || melee == this) {
+            this.dodgeLog("直接命中体不是生物: " + source.getDirectEntity());
+            return false;
+        }
+        if (melee.isSpectator() || !melee.isAlive()) {
+            this.dodgeLog("攻击者无效");
+            return false;
+        }
+        // 注意：这里**不能**过滤创造模式玩家。
+        // 创造模式砍过来照样该躲——这是演出，不是伤害判定；
+        // 而且开发时几乎都在创造模式里测，过滤掉等于永远看不到瞬移。
+        double gap = this.distanceTo(melee);
+        if (gap > DODGE_TRIGGER_RANGE) {
+            this.dodgeLog(String.format("距离 %.2f > %.2f", gap, DODGE_TRIGGER_RANGE));
+            return false;
+        }
+        if (this.random.nextFloat() >= DODGE_CHANCE) {
+            this.dodgeLog("概率未通过");
+            return false;
+        }
+        if (!this.teleportAwayFrom(server, melee)) {
+            this.dodgeLog("找不到安全落点");
+            return false;
+        }
+        this.dodgeCd = DODGE_COOLDOWN;
+        this.dodgeLog("成功，冷却 " + DODGE_COOLDOWN);
+        return true;
+    }
+
+    /**
+     * 诊断用：前若干次闪避判定把结论打进日志，之后静默。
+     *
+     * <p>闪避依赖游戏内状态（距离、命中体类型、落点是否可站），这些在代码里看不出来，
+     * 只能靠日志定位。预算用完就不再刷屏。
+     */
+    private void dodgeLog(String reason) {
+        if (DODGE_DEBUG_BUDGET > 0) {
+            DODGE_DEBUG_BUDGET--;
+            com.example.galboss.GalBoss.LOGGER.info("[Beatrice] 闪避判定: {}", reason);
+        }
+    }
+
+    /**
+     * 找一个安全落点并瞬移过去。
+     *
+     * <p>先试 {@link LivingEntity#randomTeleport(double, double, double, boolean)}——它会从给定的 Y
+     * 往下找第一块有碰撞的地板，失败会自己还原位置并返回 false。
+     *
+     * <p>但它要求「落点所在的整块碰撞箱都不挡」，在竞技场围墙边经常 12 次全失败。
+     * 所以再兜一层 {@link #findSafeSpot}：手写地形扫描，只要脚下有实体方块、站位两格空着就算数。
+     */
+    private boolean teleportAwayFrom(ServerLevel server, LivingEntity threat) {
+        Vec3 from = this.position();
+        Vec3 threatPos = threat.position();
+        for (int attempt = 0; attempt < 12; attempt++) {
+            double angle = this.random.nextDouble() * Math.PI * 2.0;
+            double distance = DODGE_MIN_DISTANCE
+                    + this.random.nextDouble() * (DODGE_MAX_DISTANCE - DODGE_MIN_DISTANCE);
+            double tx = from.x + Math.cos(angle) * distance;
+            double tz = from.z + Math.sin(angle) * distance;
+
+            // 别瞬移到攻击者脸上，否则等于没躲
+            if (threatPos.distanceToSqr(tx, from.y, tz) < DODGE_KEEP_AWAY * DODGE_KEEP_AWAY) {
+                continue;
+            }
+            if (this.randomTeleport(tx, from.y, tz, false)) {
+                this.playDodgeFx(server, from, this.position());
+                return true;
+            }
+        }
+
+        // 兜底：随机落点全失败时，按固定角度环扫一圈找可站立的地面
+        Vec3 safe = this.findSafeSpot(server, from, threatPos);
+        if (safe == null) {
+            return false;
+        }
+        this.teleportTo(safe.x, safe.y, safe.z);
+        this.playDodgeFx(server, from, this.position());
+        return true;
+    }
+
+    /**
+     * 环形扫描找可站立的位置：脚下要有碰撞方块，站位与头顶两格必须空。
+     *
+     * <p>不做 {@code noCollision} 的整体碰撞检查——那正是 {@code randomTeleport} 在围墙边失败的原因。
+     * 这里只要求「人能站」，对瞬移来说足够了。
+     */
+    @Nullable
+    private Vec3 findSafeSpot(ServerLevel server, Vec3 from, Vec3 threatPos) {
+        for (double radius = DODGE_MIN_DISTANCE; radius <= DODGE_MAX_DISTANCE; radius += 1.0) {
+            for (int i = 0; i < 16; i++) {
+                double angle = (Math.PI * 2.0 * i) / 16.0;
+                double tx = from.x + Math.cos(angle) * radius;
+                double tz = from.z + Math.sin(angle) * radius;
+                if (threatPos.distanceToSqr(tx, from.y, tz) < DODGE_KEEP_AWAY * DODGE_KEEP_AWAY) {
+                    continue;
+                }
+                for (int dy = 2; dy >= -4; dy--) {
+                    BlockPos feet = BlockPos.containing(tx, from.y + dy, tz);
+                    if (!server.hasChunkAt(feet)) {
+                        continue;
+                    }
+                    if (!server.getBlockState(feet.below()).blocksMotion()) {
+                        continue;
+                    }
+                    if (!server.getBlockState(feet).getCollisionShape(server, feet).isEmpty()) {
+                        continue;
+                    }
+                    BlockPos head = feet.above();
+                    if (!server.getBlockState(head).getCollisionShape(server, head).isEmpty()) {
+                        continue;
+                    }
+                    return new Vec3(feet.getX() + 0.5, feet.getY(), feet.getZ() + 0.5);
+                }
+            }
+        }
+        return null;
+    }
+
+    /** 起点与落点各来一轮黄金蝶，配合低频传送音。 */
+    private void playDodgeFx(ServerLevel server, Vec3 from, Vec3 to) {
+        GoldenButterflyBurst.burstAtChest(server, from);
+        GoldenButterflyBurst.burstAtChest(server, to);
+        server.sendParticles(ModParticles.GOLDEN_BUTTERFLY.get(),
+                from.x, from.y + 1.0, from.z, 10, 0.5, 0.9, 0.5, 0.03);
+        server.sendParticles(ModParticles.GOLDEN_BUTTERFLY.get(),
+                to.x, to.y + 1.0, to.z, 10, 0.5, 0.9, 0.5, 0.03);
+        server.playSound(null, from.x, from.y, from.z,
+                SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 0.9f, 1.55f);
+        server.playSound(null, to.x, to.y, to.z,
+                SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 0.9f, 1.55f);
+        server.playSound(null, to.x, to.y, to.z,
+                SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.HOSTILE, 0.7f, 1.9f);
     }
 
     @Override
@@ -1032,7 +1162,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         return InteractionResult.SUCCESS;
     }
 
-    /** 「魔女尚未复苏。」——同一秒内不刷屏。 */
     private void immuneHint() {
         if (this.immuneHintCd > 0) {
             return;
@@ -1040,6 +1169,11 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         this.immuneHintCd = 40;
         this.say("epitaph.galboss.immune", ChatFormatting.DARK_GRAY);
         this.playSoundAt(SoundEvents.SHIELD_BLOCK, 1.0f, 0.7f);
+        if (this.level() instanceof ServerLevel server) {
+            Vec3 chest = this.position().add(0.0, 1.15, 0.0);
+            server.sendParticles(ModParticles.BURST_RING.get(), chest.x, chest.y, chest.z, 1, 0, 0, 0, 0);
+            server.sendParticles(ModParticles.BURST_BUTTERFLY.get(), chest.x, chest.y, chest.z, 4, 0, 0, 0, 0);
+        }
     }
 
     @Override
@@ -1047,12 +1181,21 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         if (!this.level().isClientSide) {
             this.bossEvent.removeAllPlayers();
             this.bossEvent.setVisible(false);
-            // 第十夜：旅途结束（碑文进聊天栏，屏幕上只打「黄金乡」那句事实）
             if (this.ritualActive) {
                 this.night = 10;
                 this.say("epitaph.galboss.night.10", ChatFormatting.DARK_RED);
                 this.redTruth("redtruth.galboss.victory");
                 this.say("epitaph.galboss.victory", ChatFormatting.GOLD);
+            }
+            if (this.level() instanceof ServerLevel server) {
+                // 败北化作满天黄金蝶群消散
+                Vec3 chest = this.position().add(0.0, 1.1, 0.0);
+                PixelfxFx.play(server, this.position().add(0.0, 0.06, 0.0),
+                        PixelfxSlugs.TOHKA_BELL_WAVE, 2.4f, 0.0f);
+                server.sendParticles(ModParticles.BURST_STAR.get(), chest.x, chest.y, chest.z, 3, 0.3, 0.3, 0.3, 0.0);
+                server.sendParticles(ModParticles.BURST_BUTTERFLY.get(), chest.x, chest.y, chest.z, 16, 0.5, 0.6, 0.5, 0.0);
+                server.sendParticles(ModParticles.GOLDEN_BUTTERFLY.get(), chest.x, chest.y, chest.z, 24, 1.4, 1.2, 1.4, 0.03);
+                SpellFx.shake(server, this.position(), 40.0, 0.7f, 12);
             }
             BodySeal.clear();
             this.dropTreasures();
@@ -1061,7 +1204,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         super.die(source);
     }
 
-    /** 四件宝物：金块 ×64 / 不死图腾 / 附魔金苹果 / 贝阿朵莉切的烟斗。 */
     private void dropTreasures() {
         this.dropTreasure(new ItemStack(Items.GOLD_BLOCK, 64));
         this.dropTreasure(new ItemStack(Items.TOTEM_OF_UNDYING));
@@ -1096,22 +1238,26 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         this.bossEvent.removePlayer(player);
     }
 
-    /** 碑文期间血条显示「祭品 x/17」，复苏后改回真实血量。 */
     private void updateBossBar() {
         if (!this.ritualActive) {
             return;
         }
-        this.bossEvent.setName(Component.translatable("epitaph.galboss.bar",
-                this.nightName(), this.kills, TOTAL_SACRIFICES));
+        // 进度条改成「岛上还剩几个人」——碑文设定的十八人，死一个少一个。
+        this.bossEvent.setName(Component.translatable("epitaph.galboss.bar", this.peopleRemaining()));
         if (this.awakened) {
+            // 真复苏后所有人都已死光，剩几个人已经没信息量了，切回血量条
             float ratio = this.getMaxHealth() <= 0.0f ? 0.0f : this.getHealth() / this.getMaxHealth();
             this.bossEvent.setProgress(Math.max(0.0f, Math.min(1.0f, ratio)));
         } else {
-            this.bossEvent.setProgress(Math.min(1.0f, (float) this.kills / TOTAL_SACRIFICES));
+            this.bossEvent.setProgress(Math.min(1.0f, this.peopleRemaining() / (float) TOTAL_PEOPLE));
         }
     }
 
-    /** actionbar 那一行，由 {@code EpitaphHud} 每 0.5 秒拉一次。 */
+    /** 岛上还剩几个人：十八人 - 已献祭数（贝阿朵莉切本人也算一个）。 */
+    public int peopleRemaining() {
+        return Math.max(0, TOTAL_PEOPLE - this.kills);
+    }
+
     public Component hudLine() {
         return Component.translatable("epitaph.galboss.hud",
                 this.nightName(), this.kills, TOTAL_SACRIFICES, BodySeal.describe());
@@ -1138,17 +1284,10 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         }
     }
 
-    /** 碑文原文走聊天栏；屏幕上只留「红字：事实」。 */
     private void redTruth(String key) {
         ModNetwork.sendRedTruthKey(this.level(), this.position(), ARENA_RADIUS, key, 60);
     }
 
-    /**
-     * 排队念一句红字（屏幕单行，连续两句会互相顶掉）。
-     *
-     * @param key        语言键
-     * @param delayTicks 多少 tick 后再念
-     */
     private void queueRedTruth(String key, int delayTicks) {
         this.pendingTruthKey = key;
         this.pendingTruthTicks = Math.max(1, delayTicks);
@@ -1191,7 +1330,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         if (!this.ritualActive || !(this.level() instanceof ServerLevel level)) {
             return;
         }
-        // 读档恢复封印：不恢复的话重进存档「剜头/剜足」会静默消失
         MinecraftServer server = level.getServer();
         if (server == null) {
             return;
@@ -1210,7 +1348,7 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         this.updateBossBar();
     }
 
-    // ------------------------------------------------------------------ 调试入口（/galboss）
+    // ------------------------------------------------------------------ 调试入口
 
     public boolean isRitualActive() {
         return this.ritualActive;
@@ -1224,7 +1362,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         return this.kills;
     }
 
-    /** {@code /galboss epitaph}：直接开碑文（不依赖玩家先打她一下）；已在碑文里则<b>重开一场</b>。 */
     public void debugStartRitual() {
         if (this.ritualActive) {
             this.resetRitual();
@@ -1232,12 +1369,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         this.startRitual();
     }
 
-    /**
-     * 重开一场：先把上一场的祭品清干净再复位。
-     *
-     * <p>不清祭品会出事：旧祭品身上还带着 {@code galboss_epitaph_sacrifice} 标签，
-     * 它们之后随便怎么死都会继续给新一场计数，碑文会「凭空」推进。
-     */
     private void resetRitual() {
         for (Entity sacrifice : this.aliveSacrifices()) {
             sacrifice.discard();
@@ -1254,7 +1385,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         BodySeal.clear();
     }
 
-    /** {@code /galboss epitaph <kills>}：把献祭数设到 0~17 并补齐对应的夜/封印。 */
     public void debugJumpToKills(int kills) {
         if (!this.ritualActive) {
             this.startRitual();
@@ -1267,12 +1397,10 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         if (this.level() instanceof ServerLevel level && level.getServer() != null) {
             BodySeal.bind(level.getServer(), this.getUUID());
         }
-        // quiet：调试跳关不播报、不把人丢进黄金乡（要传送用 /galboss golden）
         this.advanceNights(true);
         this.updateBossBar();
     }
 
-    /** {@code /galboss butterflies <n>}：手动齐射一组黄金蝶。 */
     public void debugLaunchButterflies(int count) {
         this.volley(count);
     }
@@ -1281,7 +1409,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
 
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
-        // 过渡 4 tick：与黑山羊一致，太短起手会跳帧、太长会把接触帧吃掉
         AnimationController<BeatriceEntity> controller =
                 new AnimationController<>(this, CONTROLLER, 4, this::predicate);
         for (String name : TRIGGERED_ANIMS) {
@@ -1292,7 +1419,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
     }
 
     private <T extends GeoAnimatable> PlayState predicate(AnimationState<T> state) {
-        // 死亡优先级最高：之前触发的 cast 还没播完也要立刻切到倒地
         if (this.isDeadOrDying()) {
             if (!state.getController().isPlayingTriggeredAnimation()) {
                 state.getController().setAnimation(
@@ -1300,7 +1426,6 @@ public class BeatriceEntity extends Monster implements GeoEntity {
             }
             return PlayState.CONTINUE;
         }
-        // 一次性动作在播时不要把动画抢走（官方 triggerableAnim 用法要求）
         if (state.getController().isPlayingTriggeredAnimation()) {
             return PlayState.CONTINUE;
         }

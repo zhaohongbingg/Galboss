@@ -37,4 +37,21 @@ public final class PixelfxClientHooks {
         }
         PixelfxRenderer.spawn(new Vec3(x, y, z), slug, scale, yaw, lifeTicks);
     }
+
+    /** link 模式：在两个实体之间拉伸播放，位置每帧从实体实时读取。 */
+    public static void onLinkPacket(String slug, int entityA, int entityB, float scale, int lifeTicks) {
+        if (Minecraft.getInstance().level == null) {
+            return;
+        }
+        PixelfxRenderer.spawnLink(entityA, entityB, slug, scale, lifeTicks);
+    }
+
+    /** link 模式的本地播放（单机 / 客户端直接调用）。 */
+    public static void spawnLinkLocal(Level level, int entityA, int entityB,
+                                      String slug, float scale, int lifeTicks) {
+        if (level == null || Minecraft.getInstance().level == null) {
+            return;
+        }
+        PixelfxRenderer.spawnLink(entityA, entityB, slug, scale, lifeTicks);
+    }
 }

@@ -1,9 +1,9 @@
 package com.example.galboss.spell;
 
 import com.example.galboss.GalBoss;
-import com.example.galboss.fx.PixelfxSlugs;
 import com.example.galboss.fx.PixelfxFx;
-import net.minecraft.core.particles.ParticleTypes;
+import com.example.galboss.fx.PixelfxSlugs;
+import com.example.galboss.particle.ModParticles;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -21,24 +21,14 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Aegis（雅典娜的神盾）：给**任意被施法的生物**罩一层光盾，远程伤害大幅衰减。
- *
- * <p>这是唯一一个「挂在某个生物身上」的法术，但它挂的是**施法目标**（{@code warded}），
- * 不是「贝阿朵莉切」这个类：以后要给别的 boss、召唤物、甚至玩家加盾，一行
- * {@code AegisSpell.cast(level, entity)} 就行。
- *
- * <p>减伤走 {@link LivingDamageEvent}：只对 {@link DamageTypeTags#IS_PROJECTILE} 生效（×0.25），
- * 近战穿盾 —— 这就是它的反制方式（绕后 / 硬砍）。
+ * Aegis（雅典娜的神盾）：随身跟随的八边形黄金能量壁垒，大幅偏折远程弹射物。
  */
 @Mod.EventBusSubscriber(modid = GalBoss.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class AegisSpell extends Spell {
 
-    /** 护盾持续时间。 */
     private static final int DURATION = 60;
-    /** 远程伤害倍率。 */
     private static final float RANGED_MULTIPLIER = 0.25f;
 
-    /** 当前正在被护盾保护的实体（静态，供事件钩子查询）。 */
     private static final Set<UUID> WARDED = ConcurrentHashMap.newKeySet();
 
     private final LivingEntity warded;
@@ -55,31 +45,45 @@ public class AegisSpell extends Spell {
 
     @Override
     protected void step() {
+        if (!this.warded.isAlive()) {
+            WARDED.remove(this.warded.getUUID());
+            return;
+        }
         if (!this.raised) {
             this.raised = true;
             WARDED.add(this.warded.getUUID());
-            // 盾影：epitaph_aegis = 八边形能量罩（现烘自 holy/shield-aura，48 帧 / 2.4s 无缝循环）。
-            // 用 playLooping 撑满 DURATION 而不是一次性播放：48 帧比盾的 60 tick 短，一次性播会提前消失。
-            // 缩放 0.5：罩体约 130px 高 × 0.04 × 0.5 ≈ 2.6 格，罩得住大型 boss；玩家则会留一圈余量。
-            PixelfxFx.playLooping(this.level, this.warded.position().add(0.0, 1.2, 0.0),
-                    PixelfxSlugs.EPITAPH_AEGIS, DURATION, 0.5f, 0.0f);
             if (this.level instanceof ServerLevel server) {
                 server.playSound(null, this.warded.getX(), this.warded.getY(), this.warded.getZ(),
                         SoundEvents.BEACON_ACTIVATE, SoundSource.HOSTILE, 0.9f, 1.4f);
+                Vec3 center = this.warded.position().add(0.0, 1.2, 0.0);
+                server.sendParticles(ModParticles.BURST_RING.get(), center.x, center.y, center.z, 1, 0, 0, 0, 0);
             }
         }
-        // 每 10 tick 一圈金色粒子，让「还罩着」这件事一直看得见
-        if (this.age % 10 == 0 && this.level instanceof ServerLevel server) {
+
+        // 每 12 tick 在目标当前位置刷新一次 16 tick 寿命的护盾片段，配合淡入淡出实现移动随身跟随
+        if (this.age == 1 || (this.age % 12 == 0 && this.age <= DURATION - 12)) {
+            int segLife = Math.min(16, DURATION - this.age + 2);
+            PixelfxFx.playLooping(this.level, this.warded.position().add(0.0, 1.2, 0.0),
+                    PixelfxSlugs.EPITAPH_AEGIS, segLife, 0.52f, 0.0f);
+        }
+
+        // 双螺旋黄金蝶与余晖绕身护卫
+        if (this.age % 6 == 0 && this.level instanceof ServerLevel server) {
             Vec3 at = this.warded.position();
-            for (int i = 0; i < 12; i++) {
-                double angle = Math.PI * 2.0 * i / 12;
-                server.sendParticles(ParticleTypes.ENCHANT,
-                        at.x + Math.cos(angle) * 1.1,
-                        at.y + 0.8 + Math.sin(angle * 3) * 0.25,
-                        at.z + Math.sin(angle) * 1.1,
-                        1, 0.0, 0.02, 0.0, 0.0);
+            double baseAngle = this.age * 0.22;
+            for (int i = 0; i < 6; i++) {
+                double angle = baseAngle + Math.PI * 2.0 * i / 6.0;
+                double px = at.x + Math.cos(angle) * 1.15;
+                double py = at.y + 0.9 + Math.sin(angle * 2.0) * 0.35;
+                double pz = at.z + Math.sin(angle) * 1.15;
+                if (i % 3 == 0) {
+                    server.sendParticles(ModParticles.GOLDEN_BUTTERFLY.get(), px, py, pz, 1, 0.05, 0.05, 0.05, 0.0);
+                } else {
+                    server.sendParticles(ModParticles.BURST_DOT.get(), px, py, pz, 1, 0.0, 0.02, 0.0, 0.0);
+                }
             }
         }
+
         if (this.age >= DURATION) {
             WARDED.remove(this.warded.getUUID());
             if (this.level instanceof ServerLevel server) {
@@ -89,12 +93,10 @@ public class AegisSpell extends Spell {
         }
     }
 
-    /** 某个实体此刻是否被盾罩着（事件钩子 / 自检用）。 */
     public static boolean isWarded(LivingEntity entity) {
         return WARDED.contains(entity.getUUID());
     }
 
-    /** 盾只挡远程：`#is_projectile` 的伤害类型（箭、三叉戟、烈焰球…）。 */
     @SubscribeEvent
     public static void onLivingDamage(LivingDamageEvent event) {
         LivingEntity living = event.getEntity();
@@ -105,6 +107,16 @@ public class AegisSpell extends Spell {
             return;
         }
         event.setAmount(event.getAmount() * RANGED_MULTIPLIER);
+
+        // 远程弹射物偏折视觉与音效反馈
+        if (living.level() instanceof ServerLevel server) {
+            Vec3 impactPos = living.position().add(0.0, living.getBbHeight() * 0.55, 0.0);
+            PixelfxFx.play(server, impactPos, PixelfxSlugs.REI_CRIT_HIT, 0.85f, server.random.nextFloat() * 360.0f);
+            server.sendParticles(ModParticles.BURST_STAR.get(), impactPos.x, impactPos.y, impactPos.z, 1, 0.1, 0.1, 0.1, 0);
+            server.sendParticles(ModParticles.BURST_BUTTERFLY.get(), impactPos.x, impactPos.y, impactPos.z, 3, 0, 0, 0, 0);
+            server.playSound(null, impactPos.x, impactPos.y, impactPos.z,
+                    SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.HOSTILE, 1.0f, 1.85f);
+        }
     }
 
     @Override

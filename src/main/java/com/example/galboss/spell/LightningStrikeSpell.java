@@ -57,6 +57,12 @@ public class LightningStrikeSpell extends Spell {
             return;
         }
         if (this.struck) {
+            int afterImpact = this.age - this.telegraphTicks - 1;
+            if (afterImpact == 2 || afterImpact == 4) {
+                // 余电从雷柱向命中边界扩散；不重复伤害结算。
+                SpellFx.circle(this.level, this.at, RADIUS * afterImpact / 4.0,
+                        afterImpact == 2 ? SpellFx.SPARK : SpellFx.GOLD);
+            }
             return;
         }
         this.struck = true;

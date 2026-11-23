@@ -4,9 +4,11 @@ import com.example.galboss.GalBoss;
 // 注意：客户端类的引用只允许出现在 DistExecutor 的延迟 lambda 里（见下方 playInternal）。
 import com.example.galboss.client.fx.PixelfxClientHooks;
 import com.example.galboss.network.ModNetwork;
+import com.example.galboss.network.S2CPixelfxLinkPacket;
 import com.example.galboss.network.S2CPixelfxPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
@@ -77,6 +79,53 @@ public final class PixelfxFx {
     /** 循环特效的简写：只给寿命，缩放/朝向走默认。 */
     public static void playLooping(Level level, Vec3 pos, String slug, int lifeTicks) {
         playInternal(level, pos, slug, Math.max(1, lifeTicks), 1.0f, 0.0f);
+    }
+
+    /**
+     * 在两个实体之间拉伸播放（链子类特效）。
+     *
+     * <p>只发两个实体 id，位置由客户端每帧实时读取，所以链子会跟着目标移动；
+     * 任一实体死亡或离开世界，客户端会自动收掉。
+     *
+     * @param a         起点实体
+     * @param b         终点实体
+     * @param lifeTicks 寿命上限（必须 &gt; 0，否则按 40 tick 兜底）
+     * @param scale     纵向缩放倍数（横向由两点距离决定，不受这个值影响）
+     */
+    public static void playLink(Level level, Entity a, Entity b, String slug, float scale, int lifeTicks) {
+        if (level == null || a == null || b == null || slug == null || slug.isEmpty()) {
+            return;
+        }
+        if (!PixelfxSlugs.isKnown(slug)) {
+            if (WARNED_SLUGS.add(slug)) {
+                GalBoss.LOGGER.warn("[pixelfx] 未知特效 slug \"{}\"，已跳过（link）；已知 slug: {}",
+                        slug, PixelfxSlugs.asText());
+            }
+            return;
+        }
+
+        float safeScale = scale > 0.0f ? scale : 1.0f;
+        int safeLife = Math.max(1, lifeTicks > 0 ? lifeTicks : 40);
+        int idA = a.getId();
+        int idB = b.getId();
+
+        if (level.isClientSide) {
+            DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> PixelfxClientHooks
+                    .spawnLinkLocal(level, idA, idB, slug, safeScale, safeLife));
+            return;
+        }
+        if (!(level instanceof ServerLevel serverLevel)) {
+            return;
+        }
+
+        S2CPixelfxLinkPacket packet = new S2CPixelfxLinkPacket(slug, idA, idB, safeScale, safeLife);
+        Vec3 mid = a.position().add(b.position()).scale(0.5);
+        double radiusSq = BROADCAST_RADIUS * BROADCAST_RADIUS;
+        for (ServerPlayer player : serverLevel.players()) {
+            if (player.distanceToSqr(mid.x, mid.y, mid.z) <= radiusSq) {
+                ModNetwork.sendToPlayer(player, packet);
+            }
+        }
     }
 
     /**

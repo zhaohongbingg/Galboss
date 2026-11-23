@@ -6,18 +6,14 @@ import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.client.particle.ParticleRenderType;
+import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.ShaderInstance;
+import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * 粒子渲染类型工厂：绑自己的贴图 + 最近邻无 mipmap + 指定混合模式。
- *
- * <p>为什么不用原版粒子图集：pixelfx/蝴蝶这类「自己一张图集」的粒子逐个 setShaderTexture 更直接，
- * 不受 particles/*.json 与图集尺寸限制。
- *
- * @author 见 tools/particle/README.md
+ * 粒子渲染类型工厂：绑定独立贴图 + 最近邻采样 + 稳定混合模式。
  */
 public final class GalBossParticleRenderTypes {
 
@@ -29,29 +25,17 @@ public final class GalBossParticleRenderTypes {
         return create(texture, false);
     }
 
-    /**
-     * 「辉光」渲染类型。
-     *
-     * <p>老实说：真正的加色混合（SRC_ALPHA, ONE）在 MC 里没法靠这里的 {@code blendFunc} 稳定实现——
-     * {@code BufferUploader} 每批绘制都会调 {@code ShaderInstance#apply()}，它按 shader JSON 的
-     * blend 节点重置混合状态（particle.json 是 srcalpha/1-srcalpha）。要稳定加色得注册自己的
-     * core shader（带 additive blend 节点）。
-     *
-     * <p>所以这一版用**普通 alpha 混合 + 高亮贴图**模拟辉光：贴图的亮部接近白金、边缘柔和，
-     * 叠在暗场景上观感接近发光；后续如需要更「烧」的效果，再补自定义 shader。
-     */
+    /** 加色辉光混合（SRC_ALPHA, ONE：亮部叠加出白金光晕，暗部完全透明）。 */
     public static ParticleRenderType glow(ResourceLocation texture) {
-        return create(texture, false);
+        return create(texture, true);
     }
 
-    /**
-     * 兼容旧命名：当前实现等同 {@link #glow(ResourceLocation)}（见上面的说明）。
-     */
+    /** 兼容旧命名：等同 {@link #glow(ResourceLocation)}。 */
     public static ParticleRenderType additive(ResourceLocation texture) {
-        return create(texture, false);
+        return create(texture, true);
     }
 
-    private static ParticleRenderType create(ResourceLocation texture, boolean additive) {
+    static ParticleRenderType create(ResourceLocation texture, boolean additive) {
         return new ParticleRenderType() {
             private boolean filtered;
 
@@ -62,15 +46,25 @@ public final class GalBossParticleRenderTypes {
                     this.filtered = true;
                 }
                 RenderSystem.depthMask(false);
+                RenderSystem.disableCull();
                 RenderSystem.enableBlend();
-                // 顺序很重要：必须先 setShader 再 blendFunc。
-                // particle.json 自带 blend 节点（srcalpha / 1-srcalpha），setShader 会把它应用一遍，
-                // 如果先设加色再 setShader，加色会被覆盖回普通 alpha（表现为发光变灰、变暗）。
+
                 RenderSystem.setShader(GameRenderer::getParticleShader);
                 RenderSystem.setShaderTexture(0, texture);
+
+                // 预先触发一次 ShaderInstance#apply()，使 BlendMode.lastApplied 同步为当前 particleShader，
+                // 防止随后的 BufferUploader#drawWithShader 在首次批次时把加色 blendFunc 覆盖回默认 alpha。
+                ShaderInstance shader = RenderSystem.getShader();
+                if (shader != null) {
+                    shader.apply();
+                }
+
                 if (additive) {
-                    RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA,
-                            GlStateManager.DestFactor.ONE);
+                    RenderSystem.blendFuncSeparate(
+                            GlStateManager.SourceFactor.SRC_ALPHA,
+                            GlStateManager.DestFactor.ONE,
+                            GlStateManager.SourceFactor.ONE,
+                            GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
                 } else {
                     RenderSystem.defaultBlendFunc();
                 }
@@ -81,6 +75,7 @@ public final class GalBossParticleRenderTypes {
             public void end(Tesselator tesselator) {
                 tesselator.end();
                 RenderSystem.depthMask(true);
+                RenderSystem.enableCull();
                 RenderSystem.disableBlend();
                 RenderSystem.defaultBlendFunc();
             }

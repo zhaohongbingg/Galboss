@@ -1,8 +1,14 @@
 package com.example.galboss.spell;
 
+import com.example.galboss.fx.PixelfxFx;
+import com.example.galboss.fx.PixelfxSlugs;
+import com.example.galboss.particle.ModParticles;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.DustParticleOptions;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ChunkPos;
@@ -17,61 +23,34 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 棋盘审判：把施法点所在的<b>整个区块</b>铺成 8×8 的棋盘，黑白格交替点亮并结算。
- *
- * <h2>为什么是棋盘</h2>
- * 这是「黄金魔女」和棋盘竞技场之间唯一说得通的联系：她的战场本身就是棋盘，
- * 所以大范围招式的形状应该<b>借用棋盘</b>而不是随便画个圆。玩家也天然读得懂
- * 「这轮亮黑格，下一轮亮白格」——躲法明确，但需要一直移动。
- *
- * <h2>为什么按「相位」而不是一次性全炸</h2>
- * 一次性 64 格全结算等于无条件全场伤害，没有交互；分成 4 个相位、每相位只亮一半，
- * 玩家每 20 tick 必须换一次格子。跑动 8 格就能跨到另一个相位安全区，
- * 站着不动必吃 —— 和 Mjolnir 的「跑动必躲、站桩必吃」是同一条设计语言。
- *
- * <h2>性能</h2>
- * 结算<b>不逐格查实体</b>：只遍历区块内的玩家，用坐标反推格子奇偶性。
- * 64 次 {@code getEntitiesOfClass} 是没必要的，一次遍历就够。
+ * 棋盘审判：把施法点所在的整个区块铺成 8×8 的棋盘，黑白格交替点亮并结算。
  */
 public class ChessboardJudgementSpell extends Spell {
 
-    /** 每格边长（方块）。16 / 2 = 8 格 → 8×8 = 64 个格子，正好覆盖一个区块。 */
     private static final int TILE = 2;
-    /** 区块边长。 */
     private static final int CHUNK = 16;
-    /** 每边格子数。 */
     private static final int TILES = CHUNK / TILE;
 
-    /** 开场：区块边框亮起来，告诉玩家「整块区域都是战场」。 */
     private static final int WINDUP = 30;
-    /** 每个相位的长度（tick）。 */
     private static final int PHASE = 20;
-    /** 相位内第几 tick 结算（留出 14 tick 给玩家跑）。 */
     private static final int RESOLVE_AT = 14;
-    /** 相位数量：黑白各两轮。 */
     private static final int PHASES = 4;
 
-    /** 每格伤害。4 个相位全吃 = 20，但正常只能吃到 1~2 个相位。 */
     private static final float DAMAGE = 5.0f;
 
-    /** 白格 / 黑格的点缀色（金色与暗紫，和她的调色板一致）。 */
-    private static final DustParticleOptions LIGHT = new DustParticleOptions(new Vector3f(1.0f, 0.85f, 0.35f), 1.2f);
-    private static final DustParticleOptions DARK = new DustParticleOptions(new Vector3f(0.45f, 0.25f, 0.65f), 1.0f);
+    private static final DustParticleOptions LIGHT = new DustParticleOptions(new Vector3f(1.0f, 0.85f, 0.35f), 1.25f);
+    private static final DustParticleOptions DARK = new DustParticleOptions(new Vector3f(0.55f, 0.22f, 0.82f), 1.15f);
 
-    /** 区块范围（施法时算一次，后面每 tick 都用）。 */
     private final int minX;
     private final int minZ;
     private final double baseY;
 
-    /** 已经结算过的相位，防止同一相位结算两次。 */
     private final Set<Integer> resolved = new HashSet<>();
-    /** 本轮已命中（每相位重置）。 */
     private Set<UUID> hit = new HashSet<>();
 
     public ChessboardJudgementSpell(Level level, Vec3 origin, @Nullable LivingEntity caster) {
         super(level, origin, caster);
         ChunkPos chunk = new ChunkPos(BlockPos.containing(origin));
-        // 用位移而不是 ChunkPos#getMinBlockX()：字段是公开的，跨版本最稳
         this.minX = chunk.x << 4;
         this.minZ = chunk.z << 4;
         this.baseY = origin.y;
@@ -94,8 +73,10 @@ public class ChessboardJudgementSpell extends Spell {
             }
             if (this.age == 1) {
                 server.playSound(null, center.x, center.y, center.z,
-                        net.minecraft.sounds.SoundEvents.EVOKER_CAST_SPELL,
-                        net.minecraft.sounds.SoundSource.HOSTILE, 1.3f, 0.8f);
+                        SoundEvents.EVOKER_CAST_SPELL,
+                        SoundSource.HOSTILE, 1.3f, 0.8f);
+                PixelfxFx.play(server, center.add(0.0, 0.1, 0.0),
+                        PixelfxSlugs.TOHKA_CONVOCATION_CIRCLE, 3.2f, 0.0f);
             }
             return;
         }
@@ -106,37 +87,46 @@ public class ChessboardJudgementSpell extends Spell {
         }
         int local = (this.age - WINDUP - 1) % PHASE;
 
-        // 预警：本轮要亮的格子画出来
-        if (local % 4 == 0) {
-            this.drawTiles(server, phase);
+        if (local < RESOLVE_AT && local % 4 == 0) {
+            this.drawTiles(server, phase, local >= 8);
         }
-        // 结算
         if (local == RESOLVE_AT && this.resolved.add(phase)) {
             this.resolve(server, center, phase);
         }
     }
 
-    /** 画出本相位要结算的格子（奇偶性与相位一致的那一半）。 */
-    private void drawTiles(ServerLevel server, int phase) {
+    /** 画出每个 2×2 激活格子的四边边界与中心点，蓄力后半段升起微光预警。 */
+    private void drawTiles(ServerLevel server, int phase, boolean imminent) {
         int parity = phase % 2;
+        DustParticleOptions dust = parity == 0 ? LIGHT : DARK;
+        double y = this.baseY + 0.14;
+
         for (int tx = 0; tx < TILES; tx++) {
             for (int tz = 0; tz < TILES; tz++) {
                 if ((tx + tz) % 2 != parity) {
                     continue;
                 }
-                double x = this.minX + tx * TILE + TILE / 2.0;
-                double z = this.minZ + tz * TILE + TILE / 2.0;
-                server.sendParticles(parity == 0 ? LIGHT : DARK, x, this.baseY + 0.15, z,
-                        1, 0.0, 0.0, 0.0, 0.0);
+                double x0 = this.minX + tx * TILE + 0.15;
+                double x1 = this.minX + (tx + 1) * TILE - 0.15;
+                double z0 = this.minZ + tz * TILE + 0.15;
+                double z1 = this.minZ + (tz + 1) * TILE - 0.15;
+                double cx = (x0 + x1) * 0.5;
+                double cz = (z0 + z1) * 0.5;
+
+                // 四边中点勾勒 2×2 方格轮廓，使安全格与危险格清晰可辨
+                server.sendParticles(dust, cx, y, z0, 1, 0.0, 0.0, 0.0, 0.0);
+                server.sendParticles(dust, cx, y, z1, 1, 0.0, 0.0, 0.0, 0.0);
+                server.sendParticles(dust, x0, y, cz, 1, 0.0, 0.0, 0.0, 0.0);
+                server.sendParticles(dust, x1, y, cz, 1, 0.0, 0.0, 0.0, 0.0);
+
+                if (imminent) {
+                    server.sendParticles(parity == 0 ? ModParticles.BURST_DOT.get() : ParticleTypes.WITCH,
+                            cx, y + 0.25, cz, 1, 0.25, 0.15, 0.25, 0.02);
+                }
             }
         }
     }
 
-    /**
-     * 结算：只遍历区块内的玩家，用坐标反推格子奇偶性。
-     *
-     * <p>不打自己人：她的召唤物、祭品都在场上，逐格 {@code SpellFx.magic} 会把它们一起劈了。
-     */
     private void resolve(ServerLevel server, Vec3 center, int phase) {
         this.hit = new HashSet<>();
         int parity = phase % 2;
@@ -165,7 +155,7 @@ public class ChessboardJudgementSpell extends Spell {
             hits++;
         }
 
-        // 结算瞬间的视觉：亮起来的那一半格子炸一下（用粒子，不走 pixelfx，64 个实例会顶满上限）
+        int activeIdx = 0;
         for (int tx = 0; tx < TILES; tx++) {
             for (int tz = 0; tz < TILES; tz++) {
                 if ((tx + tz) % 2 != parity) {
@@ -173,14 +163,29 @@ public class ChessboardJudgementSpell extends Spell {
                 }
                 double x = this.minX + tx * TILE + TILE / 2.0;
                 double z = this.minZ + tz * TILE + TILE / 2.0;
-                server.sendParticles(net.minecraft.core.particles.ParticleTypes.END_ROD,
-                        x, this.baseY + 0.6, z, 3, 0.4, 0.5, 0.4, 0.02);
+
+                if (parity == 0) {
+                    server.sendParticles(ParticleTypes.END_ROD,
+                            x, this.baseY + 0.65, z, 3, 0.35, 0.55, 0.35, 0.03);
+                } else {
+                    server.sendParticles(ParticleTypes.WITCH,
+                            x, this.baseY + 0.65, z, 4, 0.40, 0.50, 0.40, 0.04);
+                }
+
+                // 均匀采样 8 个格子爆发蝴蝶与暴击闪光，兼顾满屏华丽度与 Pixelfx 上限
+                if (activeIdx % 4 == (phase % 4)) {
+                    server.sendParticles(ModParticles.BURST_BUTTERFLY.get(),
+                            x, this.baseY + 0.3, z, 2, 0.0, 0.0, 0.0, 0.0);
+                    PixelfxFx.play(server, new Vec3(x, this.baseY + 0.2, z),
+                            PixelfxSlugs.REI_CRIT_HIT, 0.75f, server.random.nextFloat() * 360.0f);
+                }
+                activeIdx++;
             }
         }
         server.playSound(null, center.x, center.y, center.z,
-                net.minecraft.sounds.SoundEvents.AMETHYST_BLOCK_CHIME,
-                net.minecraft.sounds.SoundSource.HOSTILE, 1.0f, 0.7f);
-        SpellFx.shake(server, center, 24.0, 0.22f, 4);
+                SoundEvents.AMETHYST_BLOCK_CHIME,
+                SoundSource.HOSTILE, 1.0f, parity == 0 ? 0.85f : 0.65f);
+        SpellFx.shake(server, center, 28.0, 0.32f, 5);
         com.example.galboss.GalBoss.LOGGER.debug("[Spell] chessboard phase {} hit {} player(s)", phase, hits);
     }
 

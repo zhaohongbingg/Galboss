@@ -535,6 +535,10 @@ async function bakeOne(entry) {
     durationTicks: frames.length,
     pivot: { x: pivotX, y: pivotY },
     anchor: entry.anchor,
+    // 屏幕平面内的旋转角（度，正 = 逆时针）。只对 billboard 生效：
+    // ground 锚点的朝向由调用方传 yaw 控制，billboard 的 yaw 会被相机朝向覆盖，
+    // 所以素材本身的「构图朝向」只能靠 roll 表达。
+    roll: entry.roll ?? 0,
     defaultScale: entry.defaultScale,
     palette: entry.palette,
     source: {

@@ -2,6 +2,7 @@ package com.example.galboss.spell;
 
 import com.example.galboss.GalBoss;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -52,15 +53,22 @@ public final class SpellEngine {
     }
 
     @SubscribeEvent
+    public static void onServerStopped(ServerStoppedEvent event) {
+        clear();
+    }
+
+    @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
-        if (ACTIVE.isEmpty()) {
+        final int activeAtStart = ACTIVE.size();
+        if (activeAtStart == 0) {
             return;
         }
-        // 遍历副本：法术可能在 step() 里再放别的法术（雷云 → 落雷）
-        for (Spell spell : new ArrayList<>(ACTIVE)) {
+        // step() 可追加子法术（雷云 → 落雷）；只推进 tick 开始时已有的法术。
+        for (int i = 0; i < activeAtStart; i++) {
+            Spell spell = ACTIVE.get(i);
             if (!spell.isFinished()) {
                 spell.tick();
             }

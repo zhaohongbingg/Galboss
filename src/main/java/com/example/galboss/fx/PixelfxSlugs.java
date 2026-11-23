@@ -62,6 +62,8 @@ public final class PixelfxSlugs {
     public static final String EPITAPH_LIGHTNING_BOLT = "epitaph_lightning_bolt";
     /** 雷云天幕（billboard，循环）。 */
     public static final String EPITAPH_STORM_SKY = "epitaph_storm_sky";
+    /** 魂链：两个目标之间的魂之索，用 {@code PixelfxFx.playLink} 沿连线拉伸（link 锚点）。 */
+    public static final String TOHKA_SOUL_CHAIN = "tohka_soul_chain";
 
     /** 契约 §3 的 10 个 slug，顺序固定。库未加载时的兜底清单（不是权威清单，权威见 {@link EffectLibrary}）。 */
     public static final List<String> ALL = List.of(
@@ -82,7 +84,9 @@ public final class PixelfxSlugs {
             EPITAPH_MJOLNIR,
             EPITAPH_AEGIS,
             EPITAPH_LIGHTNING_BOLT,
-            EPITAPH_STORM_SKY);
+            EPITAPH_STORM_SKY,
+            // link 锚点：沿两点连线拉伸的魂之索
+            TOHKA_SOUL_CHAIN);
 
     private static final Set<String> KNOWN = Set.copyOf(ALL);
 

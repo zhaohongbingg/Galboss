@@ -1,0 +1,20 @@
+{
+  "music.golden_land": {
+    "category": "music",
+    "sounds": [
+      {
+        "name": "galboss:music/golden_land",
+        "stream": true
+      }
+    ]
+  },
+  "music.mirage_coordinator": {
+    "category": "music",
+    "sounds": [
+      {
+        "name": "galboss:music/mirage_coordinator",
+        "stream": true
+      }
+    ]
+  }
+}

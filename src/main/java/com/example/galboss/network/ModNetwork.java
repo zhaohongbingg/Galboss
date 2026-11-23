@@ -59,6 +59,13 @@ public final class ModNetwork {
                 .consumerMainThread(S2CPixelfxPacket::handle)
                 .add();
 
+        // pixelfx link 特效：在两个实体之间拉伸播放（链子类），位置由客户端每帧实时读取
+        CHANNEL.messageBuilder(S2CPixelfxLinkPacket.class, nextId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(S2CPixelfxLinkPacket::encode)
+                .decoder(S2CPixelfxLinkPacket::decode)
+                .consumerMainThread(S2CPixelfxLinkPacket::handle)
+                .add();
+
         // 红字：服务端 → 客户端，屏幕正中的一句绝对断言（客户端按自己的语言解析语言键）
         CHANNEL.messageBuilder(S2CRedTruthPacket.class, nextId++, NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(S2CRedTruthPacket::encode)
