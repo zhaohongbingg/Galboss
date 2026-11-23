@@ -112,7 +112,8 @@ public final class PurgatoryStakes {
     }
 
     /** 确保黄金乡里有活着的七桩（并顺手把重生点钉好）。 */
-    private static void ensureStands(ServerLevel level, ServerPlayer player) {
+    public static void ensureStands(ServerLevel level, ServerPlayer player) {
+        System.out.println("[GATE] ensureStands enter dim=" + level.dimension().location() + " player=" + player.getName().getString());
         // 把重生点钉在降临点：在黄金乡里被打死就地复活，省得每次重新进场（调试与实战都省事）。
         // forced 必须为 true —— 原版 respawn 只在「床/重生锚」才会采纳非强制点，
         // 否则 findRespawnPositionAndUseSpawnBlock 直接返回空、退回主世界出生点（实测踩过）。
@@ -121,6 +122,7 @@ public final class PurgatoryStakes {
         // 七位是她的棋子：她不在（或已倒下）就不登场（用户要求）。
         // 注意这会连带一个效果：没召贝阿朵就进黄金乡，里面是空的。
         boolean beatriceNear = hasLivingBeatriceNear(level, GoldenLand.SPAWN);
+        System.out.println("[GATE] beatriceNear=" + beatriceNear);
         com.example.galboss.stake.StakeDebug.log("gate dim={} beatriceNear={}", level.dimension().location(), beatriceNear);
         if (!beatriceNear) {
             return;
@@ -137,8 +139,9 @@ public final class PurgatoryStakes {
         if (existingCount > 0) {
             return;
         }
+        System.out.println("[GATE] summonAll start");
         summonAll(level);
-        com.example.galboss.stake.StakeDebug.log("gate summonAll done at {}", level.dimension().location());
+        System.out.println("[GATE] summonAll done");
     }
 
     /**

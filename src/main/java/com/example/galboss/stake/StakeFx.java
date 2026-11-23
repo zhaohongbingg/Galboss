@@ -80,11 +80,16 @@ public final class StakeFx {
     public static void hurt(ServerLevel level, LivingEntity owner, LivingEntity target, float amount) {
         target.invulnerableTime = 0;
         target.hurt(level.damageSources().mobAttack(owner), amount);
+        StakeDebug.log("hurt by={} target={} amt={} hp={}",
+                StakeDebug.label(owner), target.getName().getString(), amount, target.getHealth());
 
     }
 
     public static void effect(LivingEntity target, MobEffect effect, int ticks, int amplifier) {
         target.addEffect(new MobEffectInstance(effect, ticks, amplifier, false, true, true));
+        StakeDebug.log("fx target={} effect={} ticks={} amp={}",
+                target.getName().getString(),
+                net.minecraft.core.registries.BuiltInRegistries.MOB_EFFECT.getKey(effect), ticks, amplifier);
 
     }
 

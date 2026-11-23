@@ -57,6 +57,8 @@ public final class GoldenLand {
             double z = SPAWN.z + Math.sin(angle) * SPREAD;
             player.teleportTo(target, x, SPAWN.y, z, player.getYRot(), player.getXRot());
             GoldenButterflyBurst.burstAtChest(target, new Vec3(x, SPAWN.y, z));
+            // 七桩登场：直接在这里判定，不依赖 PlayerChangedDimensionEvent 的时序
+            com.example.galboss.event.PurgatoryStakes.ensureStands(target, player);
         }
         return true;
     }
@@ -70,6 +72,8 @@ public final class GoldenLand {
         player.teleportTo(target, SPAWN.x, SPAWN.y, SPAWN.z, player.getYRot(), player.getXRot());
         playArrivalCeremony(target, SPAWN);
         GoldenButterflyBurst.burstAtChest(target, SPAWN);
+        // 七桩登场：直接在这里判定，不依赖 PlayerChangedDimensionEvent 的时序
+        com.example.galboss.event.PurgatoryStakes.ensureStands(target, player);
         return true;
     }
 
