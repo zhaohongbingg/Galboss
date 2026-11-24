@@ -89,7 +89,8 @@ public class StormSpell extends Spell {
         }
         double angle = this.level.random.nextDouble() * Math.PI * 2.0;
         double radius = this.level.random.nextDouble() * FIELD_RADIUS;
-        return this.origin.add(Math.cos(angle) * radius, 0.0, Math.sin(angle) * radius);
+        Vec3 raw = this.origin.add(Math.cos(angle) * radius, 0.0, Math.sin(angle) * radius);
+        return SpellFx.snapToGround(this.level, raw, 4, 6);
     }
 
     @Override

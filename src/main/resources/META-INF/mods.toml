@@ -23,6 +23,14 @@ license="${mod_license}"
     ordering="NONE"
     side="BOTH"
 
+# Patchouli 是可选联动（《风纪与黄金之书》手册）：装了 Patchouli 自动生效，未装时不影响模组启动。
+[[dependencies.galboss]]
+    modId="patchouli"
+    mandatory=false
+    versionRange="[1.20.1-80,)"
+    ordering="AFTER"
+    side="BOTH"
+
 # JEI 是可选联动（送礼表 / 货架在 JEI 里的两个查询分类）。
 # mandatory=false：没装 JEI 时本模组照常工作，只是少两个 JEI 分类。
 [[dependencies.galboss]]

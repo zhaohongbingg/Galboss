@@ -267,5 +267,9 @@
   "block.galboss.arena_deepslate": "Arena Deepslate",
   "block.galboss.arena_gray": "Arena Gray Tile",
   "block.galboss.arena_white": "Arena White Tile",
-  "block.galboss.arena_black": "Arena Black Tile"
+  "block.galboss.arena_black": "Arena Black Tile",
+  "block.galboss.golden_log": "Golden Land Log",
+  "block.galboss.golden_leaves": "Golden Land Leaves",
+  "book.galboss.name": "Chronicle of Discipline & Gold",
+  "book.galboss.landing": "A complete dossier on the FS Big Three, the Witch Beatrice, and the laws and treasures of the Golden Land."
 }

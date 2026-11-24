@@ -1,0 +1,17 @@
+{
+  "name": "炼狱七桩",
+  "icon": "galboss:purgatory_pillar",
+  "category": "galboss:beatrice_ritual",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "阿斯莫德、别西卜、贝尔芬格、利维坦、路西法、玛门、撒旦——贝阿朵莉切的七名炼狱之桩仆从。$(br2)在黄金乡战斗期间，只要$(bold)贝阿朵莉切仍然存活$(reset)，被击倒的炼狱之桩会在短暂延迟后复活；只有击败贝阿朵莉切本身才能彻底终结战斗。"
+    },
+    {
+      "type": "patchouli:spotlight",
+      "item": "galboss:purgatory_pillar",
+      "text": "炼狱七桩共持的武器，可近战挥击或突刺。"
+    }
+  ]
+}

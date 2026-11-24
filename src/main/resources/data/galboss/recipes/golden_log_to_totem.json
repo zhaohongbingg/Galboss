@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    {
+      "item": "galboss:golden_log"
+    }
+  ],
+  "result": {
+    "item": "minecraft:totem_of_undying",
+    "count": 1
+  }
+}

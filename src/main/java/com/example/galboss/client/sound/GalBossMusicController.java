@@ -159,9 +159,8 @@ public final class GalBossMusicController {
     /**
      * 附近有没有「正在打」的 boss。
      *
-     * <p>三人组用同步过来的战斗标记：结构里待机（右键才开战）的 boss 不算，
-     * 否则玩家在走廊里路过就会莫名其妙开始放战斗曲。贝阿朵莉切没有待机形态，
-     * 她在场就是要打，直接按存在判定。
+     * <p>三人组与贝阿朵莉切统一读取同步到客户端的战斗标记：在结构里待机（未开战）时不算，
+     * 只有真正开战（如攻击/右键触发仪式）后才播放战斗曲。
      */
     private static boolean isBattleFightNear(Player player) {
         AABB area = player.getBoundingBox().inflate(BATTLE_RADIUS);
@@ -171,7 +170,7 @@ public final class GalBossMusicController {
             }
         }
         for (BeatriceEntity boss : player.level().getEntitiesOfClass(BeatriceEntity.class, area)) {
-            if (boss.isAlive()) {
+            if (boss.isAlive() && boss.isBattleMusicActive()) {
                 return true;
             }
         }

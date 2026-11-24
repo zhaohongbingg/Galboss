@@ -1,0 +1,18 @@
+{
+  "name": "Badges & Partners",
+  "icon": "galboss:fs_badge",
+  "category": "galboss:fs_big_three",
+  "sortnum": 3,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "The badges dropped by Tohka, Rei, and Ikuko serve both as endgame crafting materials and as $(bold)FS Partner$(reset) summon items: right-click the ground to summon your tamed companion."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "galboss:fs_big_three_core",
+      "recipe2": "galboss:fs_badge",
+      "text": "Combine all three badges into the $(item)FS Big Three Core$(reset), then forge the fire-resistant $(item)FS Badge$(reset)."
+    }
+  ]
+}

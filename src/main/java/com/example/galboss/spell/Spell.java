@@ -31,12 +31,25 @@ public abstract class Spell {
         }
         this.age++;
         this.step();
-        if (this.age >= this.durationTicks()) {
-            this.finished = true;
+        if (!this.finished && this.age >= this.durationTicks()) {
+            this.finish();
         }
     }
 
+    /** 提前或正常结束法术，并触发一次 {@link #onFinish()} 清理钩子。 */
+    public final void finish() {
+        if (this.finished) {
+            return;
+        }
+        this.finished = true;
+        this.onFinish();
+    }
+
     protected abstract void step();
+
+    /** 法术结束或被强制清理时调用（子类可在此清理静态表等状态）。 */
+    protected void onFinish() {
+    }
 
     public abstract int durationTicks();
 

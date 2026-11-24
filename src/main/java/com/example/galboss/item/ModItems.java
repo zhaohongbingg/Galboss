@@ -189,6 +189,12 @@ public class ModItems {
     public static final RegistryObject<Item> ARENA_BLACK = ITEMS.register(
             "arena_black", () -> new BlockItem(ModBlocks.ARENA_BLACK.get(), new Item.Properties()));
 
+    public static final RegistryObject<Item> GOLDEN_LOG = ITEMS.register(
+            "golden_log", () -> new BlockItem(ModBlocks.GOLDEN_LOG.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> GOLDEN_LEAVES = ITEMS.register(
+            "golden_leaves", () -> new BlockItem(ModBlocks.GOLDEN_LEAVES.get(), new Item.Properties()));
+
     // ------------------------------------------- 终局奖励素材 + 宠物召唤物
     //
     // 三枚徽章既是合成 FS Big Three Core 的素材，也是「宠物版本」的召唤物：

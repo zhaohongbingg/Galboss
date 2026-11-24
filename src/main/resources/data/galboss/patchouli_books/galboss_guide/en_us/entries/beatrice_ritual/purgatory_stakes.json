@@ -1,0 +1,17 @@
+{
+  "name": "Seven Stakes of Purgatory",
+  "icon": "galboss:purgatory_pillar",
+  "category": "galboss:beatrice_ritual",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "Asmodeus, Beelzebub, Belphegor, Leviathan, Lucifer, Mammon, and Satan — Beatrice's seven furniture servants.$(br2)While $(bold)Beatrice remains alive$(reset) in the Golden Land, defeated Stakes revive after a brief delay. Defeat Beatrice herself to end the battle."
+    },
+    {
+      "type": "patchouli:spotlight",
+      "item": "galboss:purgatory_pillar",
+      "text": "The shared weapon wielded by the Seven Stakes."
+    }
+  ]
+}

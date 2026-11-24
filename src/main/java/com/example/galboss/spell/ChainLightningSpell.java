@@ -5,6 +5,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.decoration.ArmorStand;
+import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
@@ -74,8 +77,7 @@ public class ChainLightningSpell extends Spell {
         double bestDist = HOP_RANGE * HOP_RANGE;
         var box = from.getBoundingBox().inflate(HOP_RANGE);
         for (LivingEntity candidate : this.level.getEntitiesOfClass(LivingEntity.class, box)) {
-            if (candidate == from || !candidate.isAlive() || candidate.isSpectator()
-                    || candidate == this.caster || this.chain.contains(candidate)) {
+            if (!this.isChainCandidate(from, candidate)) {
                 continue;
             }
             double d = candidate.distanceToSqr(from);
@@ -85,6 +87,21 @@ public class ChainLightningSpell extends Spell {
             }
         }
         return best;
+    }
+
+    private boolean isChainCandidate(LivingEntity from, LivingEntity candidate) {
+        if (candidate == from || !candidate.isAlive() || candidate.isSpectator()
+                || candidate == this.caster || candidate instanceof ArmorStand
+                || this.chain.contains(candidate)) {
+            return false;
+        }
+        if (candidate instanceof Player player) {
+            return !player.isCreative();
+        }
+        if (from instanceof Player) {
+            return candidate instanceof Enemy;
+        }
+        return candidate instanceof Mob;
     }
 
     @Override

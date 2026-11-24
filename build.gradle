@@ -64,6 +64,21 @@ minecraft {
                 }
             }
         }
+
+        gameTestServer {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            property 'forge.enabledGameTestNamespaces', mod_id
+            property 'mixin.env.remapRefMap', 'true'
+            property 'mixin.env.refMapRemappingFile', "${buildDir}/createSrgToMcp/output.srg"
+
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
     }
 }
 
@@ -117,6 +132,19 @@ dependencies {
     } else {
         compileOnly fg.deobf("curse.maven:jei-238222:6075247")
         runtimeOnly fg.deobf("curse.maven:jei-238222:6075247")
+    }
+
+    // Patchouli 前置（纯数据包驱动手册，不直接引用 Java API）：优先吃本地缓存/libs，避免离线环境联网阻塞编译。
+    def cachedPatchouli = fileTree("${gradle.gradleUserHomeDir}/caches/forge_gradle/deobf_dependencies") {
+        include '**/Patchouli-*_mapped_*.jar'
+    }.files.find { it.isFile() }
+    if (cachedPatchouli != null) {
+        runtimeOnly files(cachedPatchouli)
+    } else {
+        def localPatchouli = fileTree('libs') { include '*Patchouli*.jar' }.files.find { it.isFile() }
+        if (localPatchouli != null) {
+            runtimeOnly fg.deobf(localPatchouli)
+        }
     }
 
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'

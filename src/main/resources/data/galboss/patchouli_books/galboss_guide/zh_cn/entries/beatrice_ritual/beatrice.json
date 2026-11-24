@@ -1,0 +1,17 @@
+{
+  "name": "贝阿朵莉切与碑文",
+  "icon": "galboss:beatrice_pipe",
+  "category": "galboss:beatrice_ritual",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "黄金魔女贝阿朵莉切在战斗中会推进$(bold)十夜碑文仪式$(reset)，依次剜去玩家的$(bold)头、胸、腹、膝、足$(reset)并施加对应封印（无法跳跃、举盾或进食等）。$(br2)当献祭计数归零进入二阶段时，她会将周围玩家一同拖入$(bold)黄金乡维度$(reset)。"
+    },
+    {
+      "type": "patchouli:entity",
+      "entity": "galboss:beatrice",
+      "text": "击败后会掉落大量金块、不死图腾、附魔金苹果以及$(item)贝阿朵莉切的烟斗$(reset)。"
+    }
+  ]
+}

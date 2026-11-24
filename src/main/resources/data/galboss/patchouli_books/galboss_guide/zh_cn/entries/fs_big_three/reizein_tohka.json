@@ -1,0 +1,17 @@
+{
+  "name": "冷泉院 桐香",
+  "icon": "galboss:tohka_badge",
+  "category": "galboss:fs_big_three",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "学生会三大巨头之首。战斗中会周期性发布$(bold)风纪检查$(reset)指令（禁止近战、远程、跳跃、盾牌、药水或进食），持续 8 秒。$(br2)违规或过度攻击会累积$(bold)记过$(reset)，记过越高，礼与郁子对你造成的伤害越高；记过满层时会触发禁足与处分。"
+    },
+    {
+      "type": "patchouli:entity",
+      "entity": "galboss:reizein_tohka",
+      "text": "代表技能：铁拳制裁、判决铃、禁足令、全校裁决。击败后掉落$(item)学生会徽章$(reset)。"
+    }
+  ]
+}

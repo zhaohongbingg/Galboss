@@ -1,0 +1,17 @@
+{
+  "name": "Beatrice & The Epitaph",
+  "icon": "galboss:beatrice_pipe",
+  "category": "galboss:beatrice_ritual",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "The Golden Witch advances the $(bold)Ten-Night Epitaph Ritual$(reset), gouging out the $(bold)head, chest, belly, knees, and feet$(reset) to apply movement, shield, or eating seals.$(br2)Upon entering Phase 2, she drags nearby players into $(bold)The Golden Land$(reset)."
+    },
+    {
+      "type": "patchouli:entity",
+      "entity": "galboss:beatrice",
+      "text": "Drops Gold Blocks, Totem of Undying, Enchanted Golden Apple, and $(item)Beatrice's Pipe$(reset)."
+    }
+  ]
+}

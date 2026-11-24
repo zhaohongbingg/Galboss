@@ -3,22 +3,28 @@ package com.example.galboss.spell;
 import com.example.galboss.fx.PixelfxSlugs;
 import com.example.galboss.fx.PixelfxFx;
 import com.example.galboss.network.ModNetwork;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import org.joml.Vector3f;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -168,12 +174,48 @@ public final class SpellFx {
         List<Player> out = new ArrayList<>();
         AABB box = new AABB(center, center).inflate(radius);
         for (Player player : level.getEntitiesOfClass(Player.class, box)) {
-            if (player.isAlive() && !player.isSpectator() && !player.isCreative()
-                    && player.position().distanceTo(center) <= radius) {
+            if (isValidPlayerTarget(player) && player.position().distanceTo(center) <= radius) {
                 out.add(player);
             }
         }
         return out;
+    }
+
+    /** 是否为可被法术命中的玩家（存活、非旁观、非创造）。 */
+    public static boolean isValidPlayerTarget(Player player) {
+        return player.isAlive() && !player.isSpectator() && !player.isCreative();
+    }
+
+    /** 构造统一的法术伤害源。 */
+    public static DamageSource magicSource(Level level, @Nullable LivingEntity source) {
+        return source == null
+                ? level.damageSources().magic()
+                : level.damageSources().indirectMagic(source, source);
+    }
+
+    /**
+     * 将坐标贴合到最近的实心方块顶面，避免高低差地形上特效浮空或埋进地里。
+     * 找不到地面时返回原坐标。
+     */
+    public static Vec3 snapToGround(Level level, Vec3 pos, int maxUp, int maxDown) {
+        int bx = (int) Math.floor(pos.x);
+        int bz = (int) Math.floor(pos.z);
+        int startY = (int) Math.floor(pos.y) + maxUp;
+        int endY = (int) Math.floor(pos.y) - maxDown;
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        for (int y = startY; y >= endY; y--) {
+            cursor.set(bx, y, bz);
+            if (!level.hasChunkAt(cursor)) {
+                return pos;
+            }
+            BlockState state = level.getBlockState(cursor);
+            VoxelShape shape = state.getCollisionShape(level, cursor);
+            if (!shape.isEmpty()) {
+                double topY = y + shape.max(net.minecraft.core.Direction.Axis.Y);
+                return new Vec3(pos.x, topY, pos.z);
+            }
+        }
+        return pos;
     }
 
     // ------------------------------------------------------------------ 结算
@@ -186,28 +228,127 @@ public final class SpellFx {
      * @return 实际命中人数
      */
     public static int magic(Level level, Vec3 center, double radius, float amount,
-                            LivingEntity source, Set<UUID> once,
+                            @Nullable LivingEntity source, Set<UUID> once,
                             int slowTicks, int slowAmp, double knockback) {
         AABB box = new AABB(center, center).inflate(radius + 1.0);
         return apply(level, box, center, radius, amount, source, once, slowTicks, slowAmp, knockback);
     }
 
-    /** 盒状魔法伤害（贯穿类：24 × 3 的长条）。 */
-    public static int magicBox(Level level, AABB box, float amount, LivingEntity source, Set<UUID> once,
+    /** 盒状魔法伤害（贯穿类）。 */
+    public static int magicBox(Level level, AABB box, float amount, @Nullable LivingEntity source, Set<UUID> once,
                                int slowTicks, int slowAmp, double knockback) {
         return apply(level, box, box.getCenter(), Double.MAX_VALUE, amount, source, once,
                 slowTicks, slowAmp, knockback);
     }
 
-    private static int apply(Level level, AABB box, Vec3 center, double radius, float amount,
-                             LivingEntity source, Set<UUID> once,
-                             int slowTicks, int slowAmp, double knockback) {
+    /**
+     * 水平线段（胶囊体）魔法伤害，解决斜向发射时 {@link AABB} 判定框膨胀的问题。
+     */
+    public static int magicSegment(Level level, Vec3 start, Vec3 end, double halfWidth,
+                                   double minY, double maxY, float amount,
+                                   @Nullable LivingEntity source, Set<UUID> once,
+                                   int slowTicks, int slowAmp, double knockback) {
+        double minX = Math.min(start.x, end.x) - halfWidth - 1.0;
+        double maxX = Math.max(start.x, end.x) + halfWidth + 1.0;
+        double minZ = Math.min(start.z, end.z) - halfWidth - 1.0;
+        double maxZ = Math.max(start.z, end.z) + halfWidth + 1.0;
+        AABB box = new AABB(minX, minY, minZ, maxX, maxY, maxZ);
+
+        double segDx = end.x - start.x;
+        double segDz = end.z - start.z;
+        double segLenSq = segDx * segDx + segDz * segDz;
+        DamageSource damageSource = magicSource(level, source);
         int hits = 0;
+
         for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class, box)) {
-            if (!target.isAlive() || target.isSpectator() || target == source) {
+            if (!isValidTarget(target, source)) {
                 continue;
             }
-            if (target instanceof Player player && player.isCreative()) {
+            double maxDist = halfWidth + target.getBbWidth() * 0.5;
+            double distSq = distSqPointToSegmentXZ(target.getX(), target.getZ(),
+                    start.x, start.z, segDx, segDz, segLenSq);
+            if (distSq > maxDist * maxDist) {
+                continue;
+            }
+            if (!once.add(target.getUUID())) {
+                continue;
+            }
+            applyHitEffects(target, start, damageSource, amount, slowTicks, slowAmp, knockback);
+            hits++;
+        }
+        return hits;
+    }
+
+    /** 周期性球形玩家魔法伤害（带单目标冷却去重）。 */
+    public static int magicPeriodicPlayers(Level level, Vec3 center, double radius, float amount,
+                                           @Nullable LivingEntity source, Map<UUID, Integer> lastHit,
+                                           int age, int cooldownTicks) {
+        AABB box = new AABB(center, center).inflate(radius + 1.0);
+        DamageSource damageSource = magicSource(level, source);
+        int hits = 0;
+        for (Player player : level.getEntitiesOfClass(Player.class, box)) {
+            if (!isValidPlayerTarget(player) || player.position().distanceTo(center) > radius) {
+                continue;
+            }
+            Integer last = lastHit.get(player.getUUID());
+            if (last != null && age - last < cooldownTicks) {
+                continue;
+            }
+            lastHit.put(player.getUUID(), age);
+            player.hurt(damageSource, amount);
+            hits++;
+        }
+        return hits;
+    }
+
+    private static double distSqPointToSegmentXZ(double px, double pz,
+                                                 double ax, double az,
+                                                 double abx, double abz, double abLenSq) {
+        if (abLenSq < 1.0E-6) {
+            double dx = px - ax;
+            double dz = pz - az;
+            return dx * dx + dz * dz;
+        }
+        double t = ((px - ax) * abx + (pz - az) * abz) / abLenSq;
+        t = Math.max(0.0, Math.min(1.0, t));
+        double cx = ax + abx * t;
+        double cz = az + abz * t;
+        double dx = px - cx;
+        double dz = pz - cz;
+        return dx * dx + dz * dz;
+    }
+
+    private static boolean isValidTarget(LivingEntity target, @Nullable LivingEntity source) {
+        if (!target.isAlive() || target.isSpectator() || target == source) {
+            return false;
+        }
+        return !(target instanceof Player player && player.isCreative());
+    }
+
+    private static void applyHitEffects(LivingEntity target, Vec3 center, DamageSource damageSource,
+                                        float amount, int slowTicks, int slowAmp, double knockback) {
+        target.hurt(damageSource, amount);
+        if (slowTicks > 0) {
+            target.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, slowTicks, slowAmp,
+                    false, false, true));
+        }
+        if (knockback > 0.01) {
+            Vec3 away = target.position().subtract(center);
+            if (away.lengthSqr() < 1.0E-4) {
+                away = new Vec3(0.0, 0.0, 1.0);
+            }
+            Vec3 dir = away.normalize();
+            target.knockback(knockback, -dir.x, -dir.z);
+        }
+    }
+
+    private static int apply(Level level, AABB box, Vec3 center, double radius, float amount,
+                             @Nullable LivingEntity source, Set<UUID> once,
+                             int slowTicks, int slowAmp, double knockback) {
+        int hits = 0;
+        DamageSource damageSource = magicSource(level, source);
+        for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class, box)) {
+            if (!isValidTarget(target, source)) {
                 continue;
             }
             if (radius != Double.MAX_VALUE && target.position().distanceTo(center) > radius + 1.0) {
@@ -216,22 +357,7 @@ public final class SpellFx {
             if (!once.add(target.getUUID())) {
                 continue;
             }
-            var damageSource = source == null
-                    ? level.damageSources().magic()
-                    : level.damageSources().indirectMagic(source, source);
-            target.hurt(damageSource, amount);
-            if (slowTicks > 0) {
-                target.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, slowTicks, slowAmp,
-                        false, false, true));
-            }
-            if (knockback > 0.01) {
-                Vec3 away = target.position().subtract(center);
-                if (away.lengthSqr() < 1.0E-4) {
-                    away = new Vec3(0.0, 0.0, 1.0);
-                }
-                Vec3 dir = away.normalize();
-                target.knockback(knockback, -dir.x, -dir.z);
-            }
+            applyHitEffects(target, center, damageSource, amount, slowTicks, slowAmp, knockback);
             hits++;
         }
         return hits;

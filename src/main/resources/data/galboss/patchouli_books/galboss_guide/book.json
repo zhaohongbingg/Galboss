@@ -1,0 +1,10 @@
+{
+  "name": "book.galboss.name",
+  "landing_text": "book.galboss.landing",
+  "book_texture": "patchouli:textures/gui/book_red.png",
+  "model": "patchouli:book_red",
+  "creative_tab": "galboss:fs_big_three",
+  "show_progress": false,
+  "version": 1,
+  "use_resource_pack": false
+}

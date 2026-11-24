@@ -19,7 +19,9 @@ import org.joml.Vector3f;
 
 import javax.annotation.Nullable;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -108,6 +110,10 @@ public class ChessboardFieldSpell extends Spell {
         if (!(this.level instanceof ServerLevel server)) {
             return;
         }
+        if (this.caster != null && !this.caster.isAlive()) {
+            this.finish();
+            return;
+        }
 
         if (!this.opened) {
             this.opened = true;
@@ -154,6 +160,8 @@ public class ChessboardFieldSpell extends Spell {
     private void warnNextColor(ServerLevel server) {
         int next = (this.activeParity() + 1) % 2;
         AABB box = new AABB(this.center, this.center).inflate(FIELD_RADIUS);
+        // 多名玩家站位重叠时去重，避免重复发送同一方块的预警粒子包
+        Set<BlockPos> warned = new HashSet<>();
         for (Player player : server.getEntitiesOfClass(Player.class, box)) {
             if (!player.isAlive() || player.isSpectator()) {
                 continue;
@@ -168,6 +176,9 @@ public class ChessboardFieldSpell extends Spell {
                         continue;
                     }
                     BlockPos pos = new BlockPos(px + dx, py - 1, pz + dz);
+                    if (!warned.add(pos)) {
+                        continue;
+                    }
                     if (this.parityAt(server, pos.getX() + 0.5, pos.getY() + 1.2, pos.getZ() + 0.5) != next) {
                         continue;
                     }
@@ -187,8 +198,9 @@ public class ChessboardFieldSpell extends Spell {
         int active = this.activeParity();
         double radiusSq = FIELD_RADIUS * FIELD_RADIUS;
         AABB box = new AABB(this.center, this.center).inflate(FIELD_RADIUS + 2.0);
+        var damageSource = SpellFx.magicSource(server, this.caster);
         for (Player player : server.getEntitiesOfClass(Player.class, box)) {
-            if (!player.isAlive() || player.isSpectator() || player.isCreative()) {
+            if (!SpellFx.isValidPlayerTarget(player)) {
                 continue;
             }
             if (player.position().distanceToSqr(this.center) > radiusSq) {
@@ -202,9 +214,7 @@ public class ChessboardFieldSpell extends Spell {
                 continue;
             }
             this.lastHit.put(player.getUUID(), this.age);
-            player.hurt(this.caster == null
-                    ? server.damageSources().magic()
-                    : server.damageSources().indirectMagic(this.caster, this.caster), DAMAGE);
+            player.hurt(damageSource, DAMAGE);
 
             server.sendParticles(active == 0 ? LIGHT : DARK,
                     player.getX(), player.getY() + 0.15, player.getZ(),

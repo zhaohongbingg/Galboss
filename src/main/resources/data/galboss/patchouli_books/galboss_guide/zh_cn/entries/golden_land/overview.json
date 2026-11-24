@@ -1,0 +1,22 @@
+{
+  "name": "黄金乡与归途之井",
+  "icon": "galboss:golden_log",
+  "category": "galboss:golden_land",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "黄金乡（$(thing)galboss:golden_land$(reset)）是由纯金铺就的异界战场。进入后玩家的临时重生点会锁定在降临点；离开黄金乡时会自动清除，不影响主世界正常重生。$(br2)$(bold)归途之井$(reset)位于 $(thing)(666, 666)$(reset)：$(br)• $(bold)战后$(reset)（击败贝阿朵莉切后）跳入井中虚空即可安全返回主世界。$(br)• $(bold)战中$(reset)跳入会被结界传回降临点。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "黄金树林",
+      "text": "黄金乡出生点周围与归途之井旁生长着$(item)黄金乡原木$(reset)与$(item)黄金乡树叶$(reset)构成的黄金树林。$(br2)破坏$(item)黄金乡树叶$(reset)有概率掉落：$(br)• $(item)金苹果$(reset)（15%，受时运加成）$(br)• $(item)附魔金苹果$(reset)（3%，受时运加成）"
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "galboss:golden_log_to_totem",
+      "text": "砍伐获得的$(item)黄金乡原木$(reset)可在合成栏中直接分解为$(item)不死图腾$(reset)。"
+    }
+  ]
+}

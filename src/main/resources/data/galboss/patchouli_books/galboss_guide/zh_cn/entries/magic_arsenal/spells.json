@@ -1,0 +1,18 @@
+{
+  "name": "领域与神兵法术",
+  "icon": "galboss:rei_gun",
+  "category": "galboss:magic_arsenal",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "贝阿朵莉切领域法术",
+      "text": "• $(bold)棋盘审判$(reset)：以区块为单位铺开 8×8 棋盘，交替引爆黑白格。$(br)• $(bold)棋盘场地$(reset)：30 秒内持续翻转实体棋盘块危险色，伴随钟声与边缘预警。$(br)• $(bold)金雨$(reset)：整区块落下密集黄金蝶雨。$(br)• $(bold)魔女领域$(reset)：收缩结界逼迫玩家向圆心聚拢，$(bold)中心核心环$(reset)是最终引爆时的唯一安全区。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "神兵与雷霆法术",
+      "text": "• $(bold)落雷 / 链雷 / 雷云$(reset)：地面缩圈预警落雷、多目标跳跃电链与持续雷暴天幕。$(br)• $(bold)永恒之枪 (Gungnir)$(reset)：24 格直线贯地穿刺，需横向躲出预警线。$(br)• $(bold)雷霆之锤 (Mjolnir)$(reset)：内外双环重击与扩散余震。$(br)• $(bold)雅典娜的神盾 (Aegis)$(reset)：大幅偏折远程弹射物伤害。$(br)• $(bold)魂链$(reset)：将周围怪物连成共伤链。"
+    }
+  ]
+}

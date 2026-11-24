@@ -1,0 +1,18 @@
+{
+  "name": "三巨头徽章与宠物",
+  "icon": "galboss:fs_badge",
+  "category": "galboss:fs_big_three",
+  "sortnum": 3,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "击败三位 Boss 获得的$(item)学生会徽章$(reset)、$(item)风纪臂章$(reset)、$(item)战斗勋章$(reset)既是终局合成素材，也是$(bold)FS 搭档宠物$(reset)的召唤物：右键地面即可召唤对应搭档并自动认主。"
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "galboss:fs_big_three_core",
+      "recipe2": "galboss:fs_badge",
+      "text": "集齐三枚徽章可合成$(item)FS Big Three Core$(reset)，进一步锻造为终局防火饰品$(item)FS 徽章$(reset)。"
+    }
+  ]
+}

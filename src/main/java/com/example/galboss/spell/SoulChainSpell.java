@@ -145,7 +145,7 @@ public class SoulChainSpell extends Spell {
         }
     }
 
-    /** 断开链路：清全局表 + 消散演出。 */
+    /** 断开链路：清全局表 + 消散演出 + 提前结束法术。 */
     private void dissolve(ServerLevel server, boolean natural) {
         if (this.dissolved) {
             return;
@@ -162,6 +162,15 @@ public class SoulChainSpell extends Spell {
         if (natural) {
             server.playSound(null, this.origin.x, this.origin.y, this.origin.z,
                     SoundEvents.AMETHYST_BLOCK_BREAK, SoundSource.HOSTILE, 0.8f, 1.3f);
+        }
+        this.finish();
+    }
+
+    @Override
+    protected void onFinish() {
+        this.dissolved = true;
+        for (LivingEntity member : this.members) {
+            BY_MEMBER.remove(member.getUUID());
         }
     }
 

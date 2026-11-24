@@ -1,0 +1,22 @@
+{
+  "name": "Golden Land & Return Well",
+  "icon": "galboss:golden_log",
+  "category": "galboss:golden_land",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "The Golden Land ($(thing)galboss:golden_land$(reset)) is a golden realm entered in Beatrice's Phase 2. Your respawn point is temporarily bound to the arrival spot and cleared automatically upon leaving.$(br2)The $(bold)Return Well$(reset) lies at $(thing)(666, 666)$(reset):$(br)• $(bold)After defeating Beatrice$(reset), jump into the void shaft to return to the Overworld.$(br)• $(bold)During battle$(reset), the barrier warps you back to spawn."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Golden Trees",
+      "text": "Golden Trees made of $(item)Golden Land Log$(reset) and $(item)Golden Land Leaves$(reset) grow around spawn and the Return Well.$(br2)Breaking $(item)Golden Land Leaves$(reset) has a chance to drop:$(br)• $(item)Golden Apple$(reset) (15%, boosted by Fortune)$(br)• $(item)Enchanted Golden Apple$(reset) (3%, boosted by Fortune)"
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "galboss:golden_log_to_totem",
+      "text": "Any $(item)Golden Land Log$(reset) can be broken down directly into a $(item)Totem of Undying$(reset)."
+    }
+  ]
+}

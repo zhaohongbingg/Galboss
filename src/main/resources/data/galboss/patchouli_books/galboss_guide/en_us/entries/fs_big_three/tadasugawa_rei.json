@@ -1,0 +1,17 @@
+{
+  "name": "Tadasugawa Rei",
+  "icon": "galboss:rei_armband",
+  "category": "galboss:fs_big_three",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "Disciplinary enforcer specializing in mid-to-long-range suppression. Uses a tactical pistol for suppressing fire, warning shots, and crossfire.$(br2)When targeted by her snipe lock, a $(bold)Lock-On Warning$(reset) appears on screen — take cover or dodge."
+    },
+    {
+      "type": "patchouli:entity",
+      "entity": "galboss:tadasugawa_rei",
+      "text": "Wields $(item)Rei's Gun$(reset). Drops $(item)Rei's Armband$(reset)."
+    }
+  ]
+}

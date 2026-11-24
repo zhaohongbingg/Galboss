@@ -1,9 +1,15 @@
 package com.example.galboss.block;
 
 import com.example.galboss.GalBoss;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.LeavesBlock;
+import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.material.PushReaction;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.registries.DeferredRegister;
@@ -46,6 +52,29 @@ public final class ModBlocks {
 
     /** 棋盘黑格。 */
     public static final RegistryObject<Block> ARENA_BLACK = BLOCKS.register("arena_black", ModBlocks::arenaBlock);
+
+    /** 黄金乡原木（可分解为不死图腾）。 */
+    public static final RegistryObject<Block> GOLDEN_LOG = BLOCKS.register("golden_log",
+            () -> new RotatedPillarBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.GOLD)
+                    .strength(2.0F)
+                    .sound(SoundType.WOOD)));
+
+    /** 黄金乡树叶（破坏有概率掉落金苹果与附魔金苹果）。 */
+    public static final RegistryObject<Block> GOLDEN_LEAVES = BLOCKS.register("golden_leaves",
+            () -> new LeavesBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.GOLD)
+                    .strength(0.2F)
+                    .randomTicks()
+                    .sound(SoundType.GRASS)
+                    .noOcclusion()
+                    .isValidSpawn((state, level, pos, type) -> false)
+                    .isSuffocating(ModBlocks::never)
+                    .isViewBlocking(ModBlocks::never)));
+
+    private static boolean never(BlockState state, BlockGetter level, BlockPos pos) {
+        return false;
+    }
 
     private ModBlocks() {
     }

@@ -115,9 +115,23 @@ public class GoldenRainSpell extends Spell {
     }
 
     private Vec3 randomPoint(ServerLevel server) {
+        // 35% 概率偏向区块内的存活玩家附近，提升走位压迫感
+        if (server.random.nextFloat() < 0.35f) {
+            AABB chunkBox = new AABB(this.minX, this.baseY - 4.0, this.minZ,
+                    this.minX + CHUNK, this.baseY + 8.0, this.minZ + CHUNK);
+            List<Player> targets = server.getEntitiesOfClass(Player.class, chunkBox, SpellFx::isValidPlayerTarget);
+            if (!targets.isEmpty()) {
+                Player chosen = targets.get(server.random.nextInt(targets.size()));
+                double jx = Math.max(this.minX + 1.0, Math.min(this.minX + CHUNK - 1.0,
+                        chosen.getX() + (server.random.nextDouble() - 0.5) * 4.0));
+                double jz = Math.max(this.minZ + 1.0, Math.min(this.minZ + CHUNK - 1.0,
+                        chosen.getZ() + (server.random.nextDouble() - 0.5) * 4.0));
+                return SpellFx.snapToGround(server, new Vec3(jx, this.baseY, jz), 3, 5);
+            }
+        }
         double x = this.minX + 1.0 + server.random.nextDouble() * (CHUNK - 2.0);
         double z = this.minZ + 1.0 + server.random.nextDouble() * (CHUNK - 2.0);
-        return new Vec3(x, this.baseY, z);
+        return SpellFx.snapToGround(server, new Vec3(x, this.baseY, z), 3, 5);
     }
 
     private void land(ServerLevel server, Drop drop) {
@@ -132,23 +146,8 @@ public class GoldenRainSpell extends Spell {
                 SoundEvents.AMETHYST_BLOCK_CHIME,
                 SoundSource.HOSTILE, 0.35f, 1.7f + server.random.nextFloat() * 0.25f);
 
-        AABB box = new AABB(at, at).inflate(DROP_RADIUS + 1.0);
-        for (Player player : server.getEntitiesOfClass(Player.class, box)) {
-            if (!player.isAlive() || player.isSpectator() || player.isCreative()) {
-                continue;
-            }
-            if (player.position().distanceTo(at) > DROP_RADIUS) {
-                continue;
-            }
-            Integer last = this.lastHit.get(player.getUUID());
-            if (last != null && this.age - last < PER_PLAYER_GAP) {
-                continue;
-            }
-            this.lastHit.put(player.getUUID(), this.age);
-            player.hurt(this.caster == null
-                    ? server.damageSources().magic()
-                    : server.damageSources().indirectMagic(this.caster, this.caster), DAMAGE);
-        }
+        SpellFx.magicPeriodicPlayers(server, at, DROP_RADIUS, DAMAGE, this.caster,
+                this.lastHit, this.age, PER_PLAYER_GAP);
     }
 
     @Override

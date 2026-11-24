@@ -1,0 +1,17 @@
+{
+  "name": "Onabuta Ikuko",
+  "icon": "galboss:ikuko_medal",
+  "category": "galboss:fs_big_three",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "First-squad melee berserker wielding a katana for charges, combos, and battle carnival with lifesteal and rage stacks.$(br2)Can summon $(bold)Black Goat Servants$(reset) from the abyss to overwhelm targets."
+    },
+    {
+      "type": "patchouli:entity",
+      "entity": "galboss:onabuta_ikuko",
+      "text": "Wields $(item)Ikuko's Katana$(reset). Drops $(item)Ikuko's Medal$(reset)."
+    }
+  ]
+}

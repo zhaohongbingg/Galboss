@@ -1,0 +1,17 @@
+{
+  "name": "女部田 郁子",
+  "icon": "galboss:ikuko_medal",
+  "category": "galboss:fs_big_three",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "一番队近战狂战士，手持武士刀进行突击、连斩与战斗狂欢，攻击附带吸血与狂怒叠层。$(br2)在深渊召唤阶段会唤出$(bold)黑山羊仆从$(reset)协同作战，需注意控制输出节奏与清理召唤物。"
+    },
+    {
+      "type": "patchouli:entity",
+      "entity": "galboss:onabuta_ikuko",
+      "text": "手持武器：$(item)郁子的武士刀$(reset)。击败后掉落$(item)战斗勋章$(reset)。"
+    }
+  ]
+}

@@ -46,7 +46,7 @@ public class AegisSpell extends Spell {
     @Override
     protected void step() {
         if (!this.warded.isAlive()) {
-            WARDED.remove(this.warded.getUUID());
+            this.finish();
             return;
         }
         if (!this.raised) {
@@ -90,7 +90,13 @@ public class AegisSpell extends Spell {
                 server.playSound(null, this.warded.getX(), this.warded.getY(), this.warded.getZ(),
                         SoundEvents.BEACON_DEACTIVATE, SoundSource.HOSTILE, 0.8f, 1.2f);
             }
+            this.finish();
         }
+    }
+
+    @Override
+    protected void onFinish() {
+        WARDED.remove(this.warded.getUUID());
     }
 
     public static boolean isWarded(LivingEntity entity) {
@@ -103,7 +109,8 @@ public class AegisSpell extends Spell {
         if (!isWarded(living)) {
             return;
         }
-        if (!event.getSource().is(DamageTypeTags.IS_PROJECTILE)) {
+        if (event.getSource().is(DamageTypeTags.BYPASSES_INVULNERABILITY)
+                || !event.getSource().is(DamageTypeTags.IS_PROJECTILE)) {
             return;
         }
         event.setAmount(event.getAmount() * RANGED_MULTIPLIER);

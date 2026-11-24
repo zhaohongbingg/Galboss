@@ -1,0 +1,17 @@
+{
+  "name": "Reizeiin Tohka",
+  "icon": "galboss:tohka_badge",
+  "category": "galboss:fs_big_three",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "Leader of the FS Big Three. Periodically announces a $(bold)Disciplinary Inspection$(reset) (forbidding melee, ranged, jumping, shields, potions, or eating) for 8 seconds.$(br2)Breaking rules or excessive aggression builds $(bold)Demerits$(reset), increasing damage dealt by Rei and Ikuko and triggering confinement sanctions at max stacks."
+    },
+    {
+      "type": "patchouli:entity",
+      "entity": "galboss:reizein_tohka",
+      "text": "Signature skills: Iron Fist, Judgement Bell, Confinement Order, School-Wide Verdict. Drops $(item)Tohka's Badge$(reset)."
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "Domains & Divine Spells",
+  "icon": "galboss:rei_gun",
+  "category": "galboss:magic_arsenal",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Beatrice's Domain Spells",
+      "text": "• $(bold)Chessboard Judgement$(reset): Illuminates and detonates alternating 8×8 chunk tiles.$(br)• $(bold)Chessboard Field$(reset): Flips arena black/white tile hazards for 30s.$(br)• $(bold)Golden Rain$(reset): Showers golden butterfly bolts across the chunk.$(br)• $(bold)Witch's Domain$(reset): Shrinking ring forcing players inward; the $(bold)center core ring$(reset) is the sole safe zone at detonation."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Divine & Lightning Spells",
+      "text": "• $(bold)Lightning / Chain / Storm$(reset): Telegraphed strikes, multi-target arcs, and storm canopies.$(br)• $(bold)Gungnir$(reset): 24-block piercing lance corridor.$(br)• $(bold)Mjolnir$(reset): Inner/outer shockwave slam.$(br)• $(bold)Aegis$(reset): Heavily deflects projectile damage.$(br)• $(bold)Soul Chain$(reset): Links nearby mobs to share incoming damage."
+    }
+  ]
+}

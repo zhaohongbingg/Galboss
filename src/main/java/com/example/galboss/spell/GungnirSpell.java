@@ -9,7 +9,6 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nullable;
@@ -102,7 +101,7 @@ public class GungnirSpell extends Spell {
         int waveIndex = this.age - (WARN + 1);
         if (waveIndex >= 0 && waveIndex < IMPACT_NODES) {
             double progress = waveIndex / (double) (IMPACT_NODES - 1);
-            Vec3 nodePos = this.origin.lerp(this.end, progress);
+            Vec3 nodePos = SpellFx.snapToGround(this.level, this.origin.lerp(this.end, progress), 2, 4);
 
             // 每个落点上方再插下一把枪：divine-lance 的 pivot 在枪尖，roll=-90 之后
             // 它自带的「前刺」动画正好读作自上而下贯地，所以把枪尖放在地表即可。
@@ -125,25 +124,16 @@ public class GungnirSpell extends Spell {
 
         if (this.age >= HIT_TICK && !this.resolved) {
             this.resolved = true;
-            AABB box = this.lineBox();
-            int hits = SpellFx.magicBox(this.level, box, DAMAGE, this.caster, this.hit, 0, 0, 1.2);
+            int hits = SpellFx.magicSegment(this.level, this.origin, this.end, HALF_WIDTH,
+                    this.origin.y - 2.0, this.origin.y + 4.0,
+                    DAMAGE, this.caster, this.hit, 0, 0, 1.2);
             if (this.level instanceof ServerLevel server) {
-                Vec3 tipPos = this.end.add(0.0, 0.5, 0.0);
+                Vec3 tipPos = SpellFx.snapToGround(this.level, this.end, 2, 4).add(0.0, 0.5, 0.0);
                 server.sendParticles(ModParticles.BURST_RING.get(), tipPos.x, tipPos.y, tipPos.z, 1, 0, 0, 0, 0);
                 server.sendParticles(ModParticles.BURST_BUTTERFLY.get(), tipPos.x, tipPos.y, tipPos.z, 5, 0.2, 0.2, 0.2, 0);
             }
             com.example.galboss.GalBoss.LOGGER.debug("[Spell] gungnir hit {} target(s)", hits);
         }
-    }
-
-    private AABB lineBox() {
-        double minX = Math.min(this.origin.x, this.end.x) - HALF_WIDTH;
-        double maxX = Math.max(this.origin.x, this.end.x) + HALF_WIDTH;
-        double minZ = Math.min(this.origin.z, this.end.z) - HALF_WIDTH;
-        double maxZ = Math.max(this.origin.z, this.end.z) + HALF_WIDTH;
-        double minY = this.origin.y - 1.0;
-        double maxY = this.origin.y + 3.0;
-        return new AABB(minX, minY, minZ, maxX, maxY, maxZ);
     }
 
     @Override

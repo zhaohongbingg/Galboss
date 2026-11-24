@@ -1,0 +1,17 @@
+{
+  "name": "糺川 礼",
+  "icon": "galboss:rei_armband",
+  "category": "galboss:fs_big_three",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "学生会风纪执行官，擅长中远距离精准压制。手持战术手枪进行压制射击、警告射击与交叉火力合围。$(br2)当进入狙击锁定状态时，屏幕上会出现$(bold)瞄准锁定提示$(reset)，需及时利用掩体或走位规避。"
+    },
+    {
+      "type": "patchouli:entity",
+      "entity": "galboss:tadasugawa_rei",
+      "text": "手持武器：$(item)礼的手枪$(reset)。击败后掉落$(item)风纪臂章$(reset)。"
+    }
+  ]
+}

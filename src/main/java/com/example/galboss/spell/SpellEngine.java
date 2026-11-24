@@ -49,6 +49,9 @@ public final class SpellEngine {
 
     /** 清空（服务器停止 / 换档时避免跨档残留）。 */
     public static void clear() {
+        for (Spell spell : List.copyOf(ACTIVE)) {
+            spell.finish();
+        }
         ACTIVE.clear();
     }
 

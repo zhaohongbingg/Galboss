@@ -1,8 +1,10 @@
 package com.example.galboss.entity;
 
+import com.example.galboss.GalBoss;
 import com.example.galboss.network.ModNetwork;
 import com.example.galboss.stake.StakeFx;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.effect.MobEffects;
@@ -13,6 +15,9 @@ import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.event.entity.living.LivingAttackEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -35,6 +40,7 @@ import java.util.UUID;
  *   <li>分身/连接关系存在内存里，不写 NBT：服务器重启后分身会变成普通的 1 血精英、连接自动失效。</li>
  * </ul>
  */
+@Mod.EventBusSubscriber(modid = GalBoss.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class AsmodeusEntity extends AbstractPurgatoryStakeEntity {
 
     /** 分身 UUID → 本体 UUID。 */
@@ -45,6 +51,8 @@ public class AsmodeusEntity extends AbstractPurgatoryStakeEntity {
 
     /** 玩家 UUID → 已连续直视的 tick 数。 */
     private final Map<UUID, Integer> gazeTicks = new HashMap<>();
+    /** 被迷醉的玩家 UUID → 迷醉结束时间（期间攻击阿斯莫德有 25% 概率落空）。 */
+    private static final Map<UUID, Long> INFATUATED_UNTIL = new HashMap<>();
 
     /** 红线连着的玩家（连接期间同步回血）。 */
     private UUID linked;
@@ -114,6 +122,7 @@ public class AsmodeusEntity extends AbstractPurgatoryStakeEntity {
                 int ticks = entry.getValue() + 5;
                 if (ticks >= GAZE_TICKS) {
                     StakeFx.effect(player, MobEffects.CONFUSION, 120, 0); // 屏幕扭曲
+                    INFATUATED_UNTIL.put(player.getUUID(), level.getGameTime() + 120L);
                     ModNetwork.sendScreenShake(level, player.position(), 4.0D, 0.25F, 8);
                     StakeFx.sound(level, player.position(), SoundEvents.AMBIENT_CAVE.value(), 0.8F, 1.6F);
                     it.remove();
@@ -228,5 +237,31 @@ public class AsmodeusEntity extends AbstractPurgatoryStakeEntity {
         StakeFx.hurt(level, this, target, 5.0F);
         com.example.galboss.network.ModNetwork.sendRedTruthLiteral(level, this.position(), 40.0D,
                 "「你已经被我的线拴住了。」", 50);
+    }
+
+    /** 迷醉状态下攻击阿斯莫德有 25% 概率落空（Miss）。 */
+    @SubscribeEvent
+    public static void onLivingAttack(LivingAttackEvent event) {
+        if (!(event.getEntity() instanceof AsmodeusEntity asmodeus) || asmodeus.level().isClientSide) {
+            return;
+        }
+        Entity attacker = event.getSource().getEntity();
+        if (!(attacker instanceof Player player)) {
+            return;
+        }
+        Long until = INFATUATED_UNTIL.get(player.getUUID());
+        if (until == null || asmodeus.level().getGameTime() > until) {
+            INFATUATED_UNTIL.remove(player.getUUID());
+            return;
+        }
+        if (player.getRandom().nextFloat() < 0.25F) {
+            event.setCanceled(true);
+            if (asmodeus.level() instanceof ServerLevel server) {
+                StakeFx.sound(server, asmodeus.position(), SoundEvents.ILLUSIONER_MIRROR_MOVE, 0.9F, 1.4F);
+                server.sendParticles(ParticleTypes.HEART,
+                        asmodeus.getX(), asmodeus.getY() + 1.4, asmodeus.getZ(), 4, 0.3, 0.3, 0.3, 0.02);
+            }
+            player.displayClientMessage(Component.literal("迷醉使你的攻击落空了！"), true);
+        }
     }
 }

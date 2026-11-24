@@ -1,5 +1,6 @@
 package com.example.galboss.stake;
 
+import com.example.galboss.entity.AbstractPurgatoryStakeEntity;
 import com.example.galboss.particle.ModParticles;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
@@ -28,10 +29,17 @@ public final class StakeFx {
 
     // ---------------------------------------------------------------- 范围查询
 
+    private static boolean isValidTarget(LivingEntity owner, LivingEntity candidate) {
+        if (candidate == owner || !candidate.isAlive()) {
+            return false;
+        }
+        return !(owner instanceof AbstractPurgatoryStakeEntity && candidate instanceof AbstractPurgatoryStakeEntity);
+    }
+
     /** 半径内的活体（不含自己与同类七桩）。 */
     public static List<LivingEntity> inRadius(ServerLevel level, LivingEntity owner, Vec3 center, double radius) {
         return level.getEntitiesOfClass(LivingEntity.class, AABB.ofSize(center, radius * 2, radius * 2, radius * 2),
-                e -> e != owner && e.isAlive());
+                e -> isValidTarget(owner, e));
     }
 
     /** 半径内的玩家。 */
@@ -45,7 +53,8 @@ public final class StakeFx {
                                             double length, double radius) {
         Vec3 end = from.add(dir.scale(length));
         AABB box = new AABB(from, end).inflate(radius);
-        return level.getEntitiesOfClass(LivingEntity.class, box, e -> e != owner && e.isAlive() && distanceToSegment(e.position(), from, end) <= radius + e.getBbWidth() * 0.5D);
+        return level.getEntitiesOfClass(LivingEntity.class, box,
+                e -> isValidTarget(owner, e) && distanceToSegment(e.position(), from, end) <= radius + e.getBbWidth() * 0.5D);
     }
 
     /** 前方扇形（半角 cos 判定）。 */
@@ -54,7 +63,7 @@ public final class StakeFx {
         Vec3 end = from.add(dir.scale(length));
         AABB box = new AABB(from, end).inflate(length * 0.5D);
         return level.getEntitiesOfClass(LivingEntity.class, box, e -> {
-            if (e == owner || !e.isAlive()) {
+            if (!isValidTarget(owner, e)) {
                 return false;
             }
             Vec3 to = e.position().subtract(from);
@@ -86,11 +95,11 @@ public final class StakeFx {
     }
 
     public static void effect(LivingEntity target, MobEffect effect, int ticks, int amplifier) {
-        target.addEffect(new MobEffectInstance(effect, ticks, amplifier, false, true, true));
-        StakeDebug.log("fx target={} effect={} ticks={} amp={}",
-                target.getName().getString(),
-                net.minecraft.core.registries.BuiltInRegistries.MOB_EFFECT.getKey(effect), ticks, amplifier);
-
+        if (target.addEffect(new MobEffectInstance(effect, ticks, amplifier, false, true, true))) {
+            StakeDebug.log("fx target={} effect={} ticks={} amp={}",
+                    target.getName().getString(),
+                    net.minecraft.core.registries.BuiltInRegistries.MOB_EFFECT.getKey(effect), ticks, amplifier);
+        }
     }
 
 

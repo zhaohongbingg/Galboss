@@ -110,8 +110,9 @@ public class WitchDomainSpell extends Spell {
 
     private void hurtOutside(ServerLevel server, double radius) {
         AABB box = new AABB(this.center, this.center).inflate(RADIUS_START + 2.0);
+        var damageSource = SpellFx.magicSource(server, this.caster);
         for (Player player : server.getEntitiesOfClass(Player.class, box)) {
-            if (!player.isAlive() || player.isSpectator() || player.isCreative()) {
+            if (!SpellFx.isValidPlayerTarget(player)) {
                 continue;
             }
             if (player.position().distanceTo(this.center) <= radius) {
@@ -122,9 +123,7 @@ public class WitchDomainSpell extends Spell {
                 continue;
             }
             this.lastHit.put(player.getUUID(), this.age);
-            player.hurt(this.caster == null
-                    ? server.damageSources().magic()
-                    : server.damageSources().indirectMagic(this.caster, this.caster), OUTSIDE_DAMAGE);
+            player.hurt(damageSource, OUTSIDE_DAMAGE);
             server.sendParticles(ParticleTypes.WITCH,
                     player.getX(), player.getY() + 0.3, player.getZ(), 8, 0.35, 0.2, 0.35, 0.02);
         }
@@ -151,17 +150,18 @@ public class WitchDomainSpell extends Spell {
                 SoundSource.HOSTILE, 1.4f, 1.1f);
         SpellFx.shake(server, this.center, 36.0, 0.65f, 10);
 
-        AABB box = new AABB(this.center, this.center).inflate(RADIUS_END + 1.5);
+        // 中心 CORE_SAFE（RADIUS_END）为唯一安全区，未及时聚拢到核心环内的玩家吃最终引爆伤害
+        AABB box = new AABB(this.center, this.center).inflate(RADIUS_START + 1.5);
+        var damageSource = SpellFx.magicSource(server, this.caster);
         for (Player player : server.getEntitiesOfClass(Player.class, box)) {
-            if (!player.isAlive() || player.isSpectator() || player.isCreative()) {
+            if (!SpellFx.isValidPlayerTarget(player)) {
                 continue;
             }
-            if (player.position().distanceTo(this.center) > RADIUS_END + 1.0) {
+            double dist = player.position().distanceTo(this.center);
+            if (dist <= RADIUS_END + 0.5 || dist > RADIUS_START + 1.5) {
                 continue;
             }
-            player.hurt(this.caster == null
-                    ? server.damageSources().magic()
-                    : server.damageSources().indirectMagic(this.caster, this.caster), FINAL_DAMAGE);
+            player.hurt(damageSource, FINAL_DAMAGE);
         }
     }
 

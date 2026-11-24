@@ -1,6 +1,7 @@
 package com.example.galboss.entity;
 
 import com.example.galboss.stake.StakeFx;
+import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -12,8 +13,11 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.Husk;
 import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Vector3f;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -33,6 +37,8 @@ public class BelphegorEntity extends AbstractPurgatoryStakeEntity {
     private static final double SAFE_RADIUS = 5.0D;
     private static final double FIELD_RADIUS = 6.0D;
     private static final int FIELD_TICKS = 160;
+    private static final DustParticleOptions ASH_CYAN =
+            new DustParticleOptions(new Vector3f(0.55F, 0.72F, 0.72F), 1.1F);
 
     /** 当前力场的中心与到期时间（0 表示没有力场）。 */
     private Vec3 fieldCenter = null;
@@ -111,15 +117,39 @@ public class BelphegorEntity extends AbstractPurgatoryStakeEntity {
         if (!(this.level() instanceof ServerLevel level)) {
             return;
         }
+        // 半休眠漂浮姿态：低重力缓降 + 慵懒结界激活时的灰青环粒子
+        this.fallDistance = 0.0F;
+        if (this.tickCount % 12 == 0) {
+            StakeFx.effect(this, MobEffects.SLOW_FALLING, 30, 0);
+            if (!playerWithin(SAFE_RADIUS)) {
+                StakeFx.ring(level, this.position().add(0, 0.9, 0), 1.2D, 10, ASH_CYAN);
+            }
+        }
+
         if (fieldCenter == null || level.getGameTime() > fieldUntil) {
             fieldCenter = null;
             return;
         }
+        // 迟缓力场：箭矢/投射物进入后减速并下坠（每 tick 生效）
+        AABB fieldBox = AABB.ofSize(fieldCenter, FIELD_RADIUS * 2.0D, FIELD_RADIUS * 2.0D, FIELD_RADIUS * 2.0D);
+        for (Projectile proj : level.getEntitiesOfClass(Projectile.class, fieldBox)) {
+            if (proj.position().distanceToSqr(fieldCenter) > FIELD_RADIUS * FIELD_RADIUS || proj.onGround()) {
+                continue;
+            }
+            Vec3 v = proj.getDeltaMovement();
+            proj.setDeltaMovement(v.x * 0.72D, Math.min(v.y * 0.72D, v.y) - 0.08D, v.z * 0.72D);
+            proj.hurtMarked = true;
+            if (this.tickCount % 3 == 0) {
+                level.sendParticles(ASH_CYAN, proj.getX(), proj.getY(), proj.getZ(), 1, 0, 0, 0, 0);
+            }
+        }
+
         if (this.tickCount % 10 != 0) {
             // 药水每 tick 重刷会把日志/同步打爆（实测刷屏），统一 10 tick 续一次
             return;
         }
         StakeFx.ring(level, fieldCenter.add(0, 0.1, 0), FIELD_RADIUS, 24, ParticleTypes.WITCH);
+        StakeFx.ring(level, fieldCenter.add(0, 0.15, 0), FIELD_RADIUS, 12, ASH_CYAN);
         for (LivingEntity inside : StakeFx.inRadius(level, this, fieldCenter, FIELD_RADIUS)) {
             if (!(inside instanceof net.minecraft.world.entity.player.Player)) {
                 continue;

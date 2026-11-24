@@ -23,6 +23,9 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerLevel;
@@ -115,6 +118,10 @@ public class BeatriceEntity extends Monster implements GeoEntity {
     private static final Set<String> TRIGGERED_ANIMS =
             Set.of("cast", "cast_area", "attack", "hurt", "death");
 
+    /** 同步给客户端的开战/仪式标记，供 BGM 控制器判断是否播放战斗曲。 */
+    private static final EntityDataAccessor<Boolean> DATA_RITUAL_ACTIVE =
+            SynchedEntityData.defineId(BeatriceEntity.class, EntityDataSerializers.BOOLEAN);
+
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
     private final ServerBossEvent bossEvent = new ServerBossEvent(
             this.getDisplayName(), BossEvent.BossBarColor.YELLOW, BossEvent.BossBarOverlay.PROGRESS);
@@ -178,6 +185,12 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         this.setPersistenceRequired();
         this.xpReward = 250;
         this.bossEvent.setVisible(false);
+    }
+
+    @Override
+    protected void defineSynchedData() {
+        super.defineSynchedData();
+        this.entityData.define(DATA_RITUAL_ACTIVE, false);
     }
 
     public static AttributeSupplier.Builder createAttributes() {
@@ -312,6 +325,7 @@ public class BeatriceEntity extends Monster implements GeoEntity {
             return;
         }
         this.ritualActive = true;
+        this.entityData.set(DATA_RITUAL_ACTIVE, true);
         this.kills = 0;
         this.night = 0;
         this.awakened = false;
@@ -623,6 +637,7 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         moved.moveTo(beatriceDest.x, beatriceDest.y, beatriceDest.z, this.getYRot(), 0.0f);
         moved.setYHeadRot(this.getYHeadRot());
         moved.ritualActive = true;
+        moved.entityData.set(DATA_RITUAL_ACTIVE, true);
         moved.kills = this.kills;
         moved.night = this.night;
         moved.awakened = this.awakened;
@@ -1196,6 +1211,14 @@ public class BeatriceEntity extends Monster implements GeoEntity {
                 server.sendParticles(ModParticles.BURST_BUTTERFLY.get(), chest.x, chest.y, chest.z, 16, 0.5, 0.6, 0.5, 0.0);
                 server.sendParticles(ModParticles.GOLDEN_BUTTERFLY.get(), chest.x, chest.y, chest.z, 24, 1.4, 1.2, 1.4, 0.03);
                 SpellFx.shake(server, this.position(), 40.0, 0.7f, 12);
+                if (GoldenLand.DIMENSION.equals(server.dimension())) {
+                    GoldenLand.ensureReturnWell(server);
+                    Component notice = Component.literal("归途之井已在 (666, 666) 开启，跳入虚空即可返回主世界。")
+                            .withStyle(ChatFormatting.GOLD);
+                    for (ServerPlayer player : server.players()) {
+                        player.sendSystemMessage(notice);
+                    }
+                }
             }
             BodySeal.clear();
             this.dropTreasures();
@@ -1318,6 +1341,7 @@ public class BeatriceEntity extends Monster implements GeoEntity {
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
         this.ritualActive = tag.getBoolean("EpitaphActive");
+        this.entityData.set(DATA_RITUAL_ACTIVE, this.ritualActive);
         this.awakened = tag.getBoolean("EpitaphAwakened");
         this.kills = Math.max(0, Math.min(TOTAL_SACRIFICES, tag.getInt("EpitaphKills")));
         this.night = Math.max(0, Math.min(10, tag.getInt("EpitaphNight")));
@@ -1354,6 +1378,11 @@ public class BeatriceEntity extends Monster implements GeoEntity {
         return this.ritualActive;
     }
 
+    /** 供客户端 BGM 控制器读取：未开战（仪式未启动）前不触发战斗曲。 */
+    public boolean isBattleMusicActive() {
+        return this.level().isClientSide ? this.entityData.get(DATA_RITUAL_ACTIVE) : this.ritualActive;
+    }
+
     public int getRitualNight() {
         return this.night;
     }
@@ -1374,6 +1403,7 @@ public class BeatriceEntity extends Monster implements GeoEntity {
             sacrifice.discard();
         }
         this.ritualActive = false;
+        this.entityData.set(DATA_RITUAL_ACTIVE, false);
         this.kills = 0;
         this.night = 0;
         this.awakened = false;

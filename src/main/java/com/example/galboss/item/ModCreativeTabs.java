@@ -56,6 +56,9 @@ public class ModCreativeTabs {
                         output.accept(ModItems.ARENA_GRAY.get());
                         output.accept(ModItems.ARENA_WHITE.get());
                         output.accept(ModItems.ARENA_BLACK.get());
+                        // 黄金乡树木
+                        output.accept(ModItems.GOLDEN_LOG.get());
+                        output.accept(ModItems.GOLDEN_LEAVES.get());
                     })
                     .build());
 

@@ -7,11 +7,16 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.entity.monster.Vex;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -100,6 +105,7 @@ public class BeelzebubEntity extends AbstractPurgatoryStakeEntity {
                     for (LivingEntity inside : StakeFx.inRadius(level, this, poolCenter, 3.0D)) {
                         StakeFx.hurt(level, this, inside, 3.0F);
                         StakeFx.effect(inside, MobEffects.POISON, 60, 0);
+                        corrodeArmor(inside, 2);
                     }
                 }
             }
@@ -127,17 +133,38 @@ public class BeelzebubEntity extends AbstractPurgatoryStakeEntity {
         for (LivingEntity around : StakeFx.inRadius(level, this, center, VACUUM_RADIUS)) {
             StakeFx.pull(around, center, 0.5D);
         }
-        // 吃掉身边的掉落物回血
+        AABB box = AABB.ofSize(center, VACUUM_RADIUS * 2, VACUUM_RADIUS * 2, VACUUM_RADIUS * 2);
+        // 吞噬掉落物、飞行弹幕与敌方召唤物（如恼鬼/黑山羊仆从）回血（最多 4 个）
         int eaten = 0;
-        for (ItemEntity item : level.getEntitiesOfClass(ItemEntity.class,
-                net.minecraft.world.phys.AABB.ofSize(center, VACUUM_RADIUS * 2, VACUUM_RADIUS * 2, VACUUM_RADIUS * 2))) {
-            if (eaten >= 3) {
+        for (ItemEntity item : level.getEntitiesOfClass(ItemEntity.class, box)) {
+            if (eaten >= 4) {
                 break;
             }
             item.discard();
             eaten++;
             this.heal(HEAL_PER_ITEM);
             StakeFx.butterfly(level, item.position(), 4, 0.3D);
+        }
+        for (Projectile proj : level.getEntitiesOfClass(Projectile.class, box)) {
+            if (eaten >= 4) {
+                break;
+            }
+            if (proj.getOwner() == this) {
+                continue;
+            }
+            proj.discard();
+            eaten++;
+            this.heal(HEAL_PER_ITEM);
+            StakeFx.butterfly(level, proj.position(), 4, 0.3D);
+        }
+        for (Vex vex : level.getEntitiesOfClass(Vex.class, box)) {
+            if (eaten >= 4) {
+                break;
+            }
+            vex.discard();
+            eaten++;
+            this.heal(HEAL_PER_ITEM * 1.5F);
+            StakeFx.butterfly(level, vex.position(), 5, 0.4D);
         }
     }
 
@@ -158,6 +185,7 @@ public class BeelzebubEntity extends AbstractPurgatoryStakeEntity {
             StakeFx.hurt(level, this, hit, 8.0F);
             StakeFx.effect(hit, MobEffects.POISON, 160, 0);   // 中毒 8 秒
             StakeFx.effect(hit, MobEffects.CONFUSION, 160, 0);
+            corrodeArmor(hit, 4);
         }
         // 酸液池本体（持续 8 秒的真实伤害区）
         this.poolCenter = target.position();
@@ -171,5 +199,16 @@ public class BeelzebubEntity extends AbstractPurgatoryStakeEntity {
         }
         com.example.galboss.network.ModNetwork.sendRedTruthLiteral(level, this.position(), 40.0D,
                 "「饿着的人，连骨头都是甜的。」", 50);
+    }
+
+    /** 腐蚀护甲：加速损耗全身穿戴护甲的耐久度。 */
+    private static void corrodeArmor(LivingEntity target, int damage) {
+        for (EquipmentSlot slot : new EquipmentSlot[]{
+                EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}) {
+            ItemStack stack = target.getItemBySlot(slot);
+            if (!stack.isEmpty() && stack.isDamageableItem()) {
+                stack.hurtAndBreak(damage, target, entity -> entity.broadcastBreakEvent(slot));
+            }
+        }
     }
 }

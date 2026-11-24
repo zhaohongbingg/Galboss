@@ -224,7 +224,10 @@ const elements = cubes.map((c) => {
 const DISPLAY = {
   // 刀：刀身在模型空间沿 +Y（刀尖朝上），套原版 item/handheld 的第三人称旋转
   'ikuko_katana.json': {
-    guiRotation: [0, 0, 0],
+    guiRotation: [0, 0, -45],
+    fixedRotation: [0, 0, -45],
+    groundRotation: [0, 0, 45],
+    groundScale: 0.55,
     thirdperson_righthand: { rotation: [0, -90, 55], scale: [1, 1, 1] },
     thirdperson_lefthand: { rotation: [0, 90, -55], scale: [1, 1, 1] },
     firstperson_righthand: { rotation: [0, -90, 25], translation: [1.13, 3.2, 1.13], scale: [0.68, 0.68, 0.68] },
@@ -233,14 +236,15 @@ const DISPLAY = {
   // 枪：枪管沿 -Z（朝角色正面），所以**不转**就已经指向前方 —— 和旧方案（geckolib 直接按
   //     geo 原点摆放、骨骼旋转已清零）的姿态一致。想让它口下压就改这一项，例如 [-30,0,0]。
   'rei_gun.json': {
-    // gui 绕 Y 转 -90°：把枪管摆到屏幕横向上，图标才是侧面剪影。
-    // 不转的话原版是沿 -Z 看模型，看到的是 +Z 那一侧 —— 正好是枪管戳进屏幕、
-    // 只留个枪屁股，图标糊成一团（刀没这问题是因为刀身长轴竖直）。
+    // gui / fixed 绕 Y 转 -90°：把枪管摆到屏幕横向上，图标和展示框才是侧面剪影。
     guiRotation: [0, -90, 0],
+    fixedRotation: [0, -90, 0],
+    groundRotation: [0, 0, 0],
+    groundScale: 0.75,
     thirdperson_righthand: { rotation: [0, 0, 0], scale: [1, 1, 1] },
     thirdperson_lefthand: { rotation: [0, 0, 0], scale: [1, 1, 1] },
-    firstperson_righthand: { rotation: [0, 0, 0], translation: [1.13, 3.2, 1.13], scale: [0.68, 0.68, 0.68] },
-    firstperson_lefthand: { rotation: [0, 0, 0], translation: [1.13, 3.2, 1.13], scale: [0.68, 0.68, 0.68] }
+    firstperson_righthand: { rotation: [0, 0, 0], translation: [0.5, 2.5, -1.0], scale: [0.85, 0.85, 0.85] },
+    firstperson_lefthand: { rotation: [0, 0, 0], translation: [0.5, 2.5, -1.0], scale: [0.85, 0.85, 0.85] }
   },
   // 烟斗：长轴沿 X（geo 空间里斗在 +X 端、嘴含的那头在 -X 端），物品空间 x 又被取反，
   //   所以斗落在 -X 侧、嘴那头在 +X 侧。握把定在靠嘴那段的杆上，模型从手心往前伸出去。
@@ -248,6 +252,9 @@ const DISPLAY = {
   //   GUI 图标不转 —— 长轴本来就在画面横向上，正好是侧视剪影。
   'beatrice_pipe.json': {
     guiRotation: [0, 0, 0],
+    fixedRotation: [0, 0, 0],
+    groundRotation: [0, 0, 0],
+    groundScale: 0.75,
     thirdperson_righthand: { rotation: [0, -90, 0], scale: [1, 1, 1] },
     thirdperson_lefthand: { rotation: [0, -90, 0], scale: [1, 1, 1] },
     firstperson_righthand: { rotation: [0, -90, 0], translation: [1.13, 3.2, 1.13], scale: [0.68, 0.68, 0.68] },
@@ -257,7 +264,13 @@ const DISPLAY = {
 
 const preset = { ...(DISPLAY[outModel] ?? {}) };
 const guiRot = preset.guiRotation ?? [0, 0, 0];
+const fixedRot = preset.fixedRotation ?? guiRot;
+const groundRot = preset.groundRotation ?? [0, 0, 0];
+const groundScale = preset.groundScale ?? 0.65;
 delete preset.guiRotation;
+delete preset.fixedRotation;
+delete preset.groundRotation;
+delete preset.groundScale;
 
 // ---- GUI 展示：整把武器缩放进 16³ 的物品格并居中（物品栏图标用） ----
 // 变换语义见【3】：v' = R * S * (v - 模型中心) + translation，
@@ -301,17 +314,40 @@ const elemCorners = (e) => {
   });
 };
 
-const rel = [];
-for (const e of elements) {
-  for (const p of elemCorners(e)) rel.push(rotXYZ(guiRot, [p[0] - 8, p[1] - 8, p[2] - 8]));
-}
-const rlo = [0, 1, 2].map((i) => Math.min(...rel.map((c) => c[i])));
-const rhi = [0, 1, 2].map((i) => Math.max(...rel.map((c) => c[i])));
-const guiScale = r3(15 / Math.max(...rhi.map((v, i) => v - rlo[i])));
-const guiTrans = [0, 1, 2].map((i) => r3(-guiScale * ((rlo[i] + rhi[i]) / 2)));
+const fitSlot = (rot, targetSpan = 15) => {
+  const rel = [];
+  for (const e of elements) {
+    for (const p of elemCorners(e)) rel.push(rotXYZ(rot, [p[0] - 8, p[1] - 8, p[2] - 8]));
+  }
+  const rlo = [0, 1, 2].map((i) => Math.min(...rel.map((c) => c[i])));
+  const rhi = [0, 1, 2].map((i) => Math.max(...rel.map((c) => c[i])));
+  const scale = r3(targetSpan / Math.max(...rhi.map((v, i) => v - rlo[i])));
+  const trans = [0, 1, 2].map((i) => r3(-scale * ((rlo[i] + rhi[i]) / 2)));
+  return { rotation: rot, translation: trans, scale: [scale, scale, scale] };
+};
+
+const guiTransform = fitSlot(guiRot, 15);
+const fixedTransform = fitSlot(fixedRot, 14);
+const groundCenter = (() => {
+  const rel = [];
+  for (const e of elements) {
+    for (const p of elemCorners(e)) rel.push(rotXYZ(groundRot, [p[0] - 8, p[1] - 8, p[2] - 8]));
+  }
+  const rlo = [0, 1, 2].map((i) => Math.min(...rel.map((c) => c[i])));
+  const rhi = [0, 1, 2].map((i) => Math.max(...rel.map((c) => c[i])));
+  return {
+    rotation: groundRot,
+    translation: [
+      r3(-groundScale * ((rlo[0] + rhi[0]) / 2)),
+      r3(-groundScale * rlo[1] + 1.5),
+      r3(-groundScale * ((rlo[2] + rhi[2]) / 2))
+    ],
+    scale: [groundScale, groundScale, groundScale]
+  };
+})();
 
 console.log(`物品空间包围盒 from=${JSON.stringify(lo)} to=${JSON.stringify(hi)}`);
-console.log(`gui 展示: rotation=${JSON.stringify(guiRot)} scale=${guiScale} translation=${JSON.stringify(guiTrans)}`);
+console.log(`gui 展示: rotation=${JSON.stringify(guiRot)} scale=${guiTransform.scale[0]} translation=${JSON.stringify(guiTransform.translation)}`);
 if (negativeUv) console.log(`⚠ 有 ${negativeUv} 个面的 uv_size 为负（已按镜像保留）`);
 if (rotated) console.log(`立方体自带旋转: ${rotated} 个已转成原版 element rotation`);
 if (multiAxis.length) {
@@ -326,7 +362,9 @@ if (illegalAngles.size) {
 const display = {
   ...preset,
   // 第三人称的 translation 一律留空：握把已经在模型中心，落在骨骼原点即为手心。
-  gui: { rotation: guiRot, translation: guiTrans, scale: [guiScale, guiScale, guiScale] }
+  gui: guiTransform,
+  fixed: fixedTransform,
+  ground: groundCenter
 };
 for (const [k, v] of Object.entries(display)) {
   v.translation = v.translation ?? [0, 0, 0];
